@@ -1,0 +1,31 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Model weights (large files)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.bin
+
+# Training runs & logs
+runs/
+wandb/
+*.log
+
+# IDE
+.vscode/
+.idea/

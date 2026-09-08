@@ -1,0 +1,32 @@
+# Pipeline Configuration for UAV Solar PV Dataset
+project:
+  name: solar_uav_project
+  crs: "EPSG:32649" # To be confirmed via CRS audit (EPSG:32648 vs 32649)
+  farm_id: farm_01_thuan_nam_19
+
+photogrammetry:
+  orthomosaic_path: dataset/farm_01_thuan_nam_19/photogrammetry/orthomosaic_87m.tif
+  dsm_path: dataset/farm_01_thuan_nam_19/photogrammetry/dsm_87m.tif
+
+gpkg:
+  master_gpkg_path: dataset/farm_01_thuan_nam_19/module_reference/thuannam19_master.gpkg
+  aoi_layer: aoi_boundary
+  modules_layer: modules
+
+splits:
+  buffer_distance_m: 15.0
+  train_ratio: 0.60
+  val_ratio: 0.15
+  test_ratio: 0.25
+
+models:
+  model1_pv_detector:
+    task: yolo_obb
+    weights: code/models/model1_pv_detection/best.pt
+    input_size: 1024
+    classes: ["solar_panel"]
+  model2_thermal_anomaly:
+    task: yolo_obb
+    weights: code/models/model2_thermal_fault/fault_obb_4class.pt
+    input_size: 640
+    classes: ["SingleHotSpot", "MultiHotSpot", "Bypass", "ModuleOpenCircuit"]
