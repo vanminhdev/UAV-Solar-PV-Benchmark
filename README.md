@@ -1,17 +1,23 @@
-﻿# UAV Solar PV Codebase & Benchmarking Pipeline
+# UAV Solar PV Benchmark - code
 
-Source code and reproducible experiment pipelines accompanying the scientific paper:
-*"A Multi-Scale, Multimodal UAV Photogrammetry and Radiometric Thermal Dataset for Persistent PV Module-Level Spatial Benchmarking"*
+Code accompanying the dataset *"A multimodal multi-altitude UAV dataset with persistent module identifiers for photovoltaic inspection in Vietnam"*.
+The dataset itself is distributed separately (Zenodo); this repository only holds processing code.
 
-## Structure
+## Layout
 
-- `configs/`: Pipeline settings, CRS, I/O paths, baseline hyperparameters (`pipeline_config.yaml`).
-- `src/`: Modular Python library:
-  - `geo_utils.py`: Coordinate transformations, camera ray-casting, georeferencing.
-  - `gpkg_builder.py`: Building Master GeoPackage with `aoi_boundary` and `modules`.
-  - `spatial_split.py`: Footprint-disjoint spatial strip split with buffer isolation.
-  - `mapper.py`: Spatial registration and module association algorithms.
-  - `metrics.py`: Top-1 accuracy, RMSE 2D, mIoU, Cohen\'s Kappa, mAP.
-- `notebooks/`: Step-by-step reproducible workflows (01 to 05).
-- `scripts/`: Independent validation scripts (e.g., `compute_qc_metrics.py`).
-- `models/`: Weights and configs for baseline models.
+| Path | Content |
+|---|---|
+| `qgis/` | QGIS Python-console scripts used by the annotators: `draw_grid.py` (draw a module grid along a reference line), `module_id.py` (sweep-line `String_ID`/`module_id` assignment), `build_master_gpkg.py` (AOI + master GeoPackage), `editcolor_export.py` (styling). Original, unmodified copies. |
+| `scripts/build_image_inventory.py` | EXIF/DJI-XMP inventory of all UAV JPGs -> `image_inventory.csv`, `flight_summary.csv`. |
+| `scripts/inspect_geo.py` | GeoTIFF header audit (CRS, GSD, bounds) and GeoPackage audit (module count, unique ids, module size). |
+| `scripts/drive_tools.py` | Crawl and resumably download public Google Drive folders. |
+| `configs/pipeline_config.yaml` | Paths, CRS and split settings. |
+
+Training, evaluation, spatial-split and mapping code will be added under `src/` and `notebooks/`;
+model weights go under `models/` (git-ignored).
+
+## Setup
+
+```
+pip install -r requirements.txt
+```

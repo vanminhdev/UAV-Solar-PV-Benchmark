@@ -29,3 +29,23 @@ wandb/
 # IDE
 .vscode/
 .idea/
+
+# Data (lives in the dataset, not in this repo)
+*.tif
+*.tiff
+*.gpkg
+*.zip
+*.JPG
+*.jpg
+drive_download/
+
+# throwaway one-off scripts/outputs
+_tmp/
+scratch/
+.local/
+*.aux
+*.fdb_latexmk
+*.fls
+
+# Dataset is released separately (Zenodo), never in this repo
+dataset/

@@ -1,0 +1,6 @@
+numpy
+pandas
+pillow
+pyproj
+rasterio
+gdown

@@ -1,17 +1,18 @@
-# Pipeline Configuration for UAV Solar PV Dataset
+# Pipeline configuration (paths are relative to the dataset root)
 project:
   name: solar_uav_project
-  crs: "EPSG:32649" # To be confirmed via CRS audit (EPSG:32648 vs 32649)
+  crs: "EPSG:32649"   # verified on GeoTIFF/GeoPackage headers 2026-09-30
   farm_id: farm_01_thuan_nam_19
 
-photogrammetry:
-  orthomosaic_path: dataset/farm_01_thuan_nam_19/photogrammetry/orthomosaic_87m.tif
-  dsm_path: dataset/farm_01_thuan_nam_19/photogrammetry/dsm_87m.tif
+inventory:
+  raw_images_root: dataset/farm_01_thuan_nam_19/raw_images
+  out_dir: dataset/metadata/inventory
 
-gpkg:
-  master_gpkg_path: dataset/farm_01_thuan_nam_19/module_reference/thuannam19_master.gpkg
+module_reference:
+  master_gpkg: dataset/farm_01_thuan_nam_19/module_reference/TN19_modules_master.gpkg
   aoi_layer: aoi_boundary
   modules_layer: modules
+  ortho_layer: orthophoto_87m   # raster tile layer stored inside the GeoPackage
 
 splits:
   buffer_distance_m: 15.0
@@ -20,13 +21,8 @@ splits:
   test_ratio: 0.25
 
 models:
-  model1_pv_detector:
-    task: yolo_obb
-    weights: code/models/model1_pv_detection/best.pt
-    input_size: 1024
-    classes: ["solar_panel"]
+  model1_pv_detector: {task: yolo_obb, input_size: 1024, classes: [solar_panel]}
   model2_thermal_anomaly:
     task: yolo_obb
-    weights: code/models/model2_thermal_fault/fault_obb_4class.pt
     input_size: 640
-    classes: ["SingleHotSpot", "MultiHotSpot", "Bypass", "ModuleOpenCircuit"]
+    classes: [SingleHotSpot, MultiHotSpot, Bypass, ModuleOpenCircuit]  # 416 boxes in 31 frames of one TN19 42M flight; train only
