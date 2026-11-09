@@ -11,7 +11,7 @@ Inputs
                  raw R-JPEGs; BIM2 file names such as DJI_0161_T.JPG repeat across flights so the name alone is ambiguous)
 No image is copied: the labels refer to the ORIGINAL raw R-JPEGs already in dataset/<farm>/raw_images/.
 
-Outputs, per farm, in dataset/<farm_dir>/annotations/model2_thermal_anomaly_obb/
+Outputs, per farm, in dataset/<farm_dir>/annotations/thermal_anomaly_obb/
   thermal_frame_boxes.csv     one row per source box (all of them, also those not written to the YOLO files)
   labels_yolo_obb/<flight_id>/<thermal stem>.txt   YOLO-OBB with coordinates CLIPPED to [0,1]; boxes with < MIN_FRAC of
                               their area inside the frame are not written (kept_in_yolo = 0 in the csv)
@@ -36,7 +36,7 @@ FARM_DIR = {"ThuanNam19": "farm_01_thuan_nam_19", "BIM2": "farm_02_bim_2",
             "ThuanNamDucLong": "farm_03_thuan_nam_duc_long", "ThienTan": "farm_04_thien_tan"}
 FARM_CODE = {"ThuanNam19": "TN19", "BIM2": "BIM2", "ThuanNamDucLong": "TNDL", "ThienTan": "TT"}
 MIN_FRAC = 0.30
-SUB = "annotations/model2_thermal_anomaly_obb"
+SUB = "annotations/thermal_anomaly_obb"
 FRAME = sbox(0, 0, 1, 1)
 
 YAML = """# Frame-level thermal anomaly labels (YOLO-OBB), {farm}

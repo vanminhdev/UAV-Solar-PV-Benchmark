@@ -17,7 +17,7 @@ from shapely.geometry import Point, Polygon
 
 ROOT = Path(__file__).resolve().parents[2]
 DS = ROOT / "dataset"
-SUB = "annotations/model2_thermal_anomaly_obb"
+SUB = "annotations/thermal_anomaly_obb"
 FARMS = {"TN19": "farm_01_thuan_nam_19", "TNDL": "farm_03_thuan_nam_duc_long", "TT": "farm_04_thien_tan"}
 
 

@@ -685,8 +685,8 @@ def la_classes(boxes):
 def la_boxes():
     """All thermal boxes of the labelled flights + physical-module clusters (IoU-linked, within a farm)."""
     from shapely.geometry import Polygon
-    fs = [pd.read_csv(d / "annotations/model2_thermal_anomaly_obb/thermal_boxes.csv")
-          for d in FARM_DIR.values() if (d / "annotations/model2_thermal_anomaly_obb/thermal_boxes.csv").exists()]
+    fs = [pd.read_csv(d / "annotations/thermal_anomaly_obb/thermal_boxes.csv")
+          for d in FARM_DIR.values() if (d / "annotations/thermal_anomaly_obb/thermal_boxes.csv").exists()]
     b = pd.concat(fs, ignore_index=True)
     b = b[b.flight_id.isin(LA_TN19 + list(LA_TARGET.values()))].copy()
     b["farm"] = b.flight_id.str.split("_").str[0]

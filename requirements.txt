@@ -1,6 +1,15 @@
 numpy
 pandas
+scipy
 pillow
 pyproj
 rasterio
+shapely
+matplotlib
+opencv-python
+PyMuPDF
+tabulate
 gdown
+# baseline detector only (Technical Validation)
+torch
+ultralytics

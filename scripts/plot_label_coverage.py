@@ -45,7 +45,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     fp = bf.read_gpkg_layer(bf.GPKG, "image_footprints")
     fp = fp[fp.sensor == "T"]
-    boxes = pd.concat([pd.read_csv(p) for p in ds.glob("farm_0*/annotations/model2_thermal_anomaly_obb/thermal_boxes.csv")])
+    boxes = pd.concat([pd.read_csv(p) for p in ds.glob("farm_0*/annotations/thermal_anomaly_obb/thermal_boxes.csv")])
     zones = {}
     for k, (farm, fid) in FLIGHTS.items():
         j = json.loads((src / k / "nhan_tay.json").read_text(encoding="utf-8"))

@@ -14,6 +14,8 @@ Modes
               -> thermal_parameters.csv
   files     : decode explicit files / folders (used for the SDK sample images)
   export    : save decoded matrices of listed files as float16 .npy
+  exportall : resumable float16 .npz export of ALL inventory thermal images
+              -> dataset/derived/thermal_temperature_celsius/<flight_id>/<stem>.npz + temperature_index.csv
   summary   : per-flight / per-hour summaries from the CSVs (SDK not needed)
   samples   : 12 example frames (.npy float16) + 4-panel PNG per farm
 
@@ -268,6 +270,79 @@ def cmd_export(a):
         print("saved", Path(f).name, m.shape)
 
 
+INDEX_COLS = ["image_id", "farm", "flight_id", "rel_path", "dtype", "shape", "min_c", "p01_c", "median_c",
+              "p99_c", "max_c", "emissivity", "reflected_temp_c", "distance_m", "humidity_pct",
+              "ambient_temp_c", "sdk_version", "decode_status"]
+
+
+def _export_work(job):
+    farm, flight_id, path, outroot = job
+    p = Path(path)
+    rel = f"{flight_id}/{p.stem}.npz"
+    row = dict(image_id=p.stem, farm=farm, flight_id=flight_id, rel_path=rel, dtype="float16")
+    try:
+        rec, m = _D.decode(path, want_matrix=True)
+        row.update({k: rec.get(k, "") for k in ("emissivity", "reflected_temp_c", "distance_m",
+                                                 "humidity_pct", "ambient_temp_c", "sdk_version")})
+        if m is None:
+            row["decode_status"] = "FAILED " + rec.get("error", "")
+            return row
+        h = m.astype(np.float16)
+        s = h.astype(np.float32)   # statistics describe the STORED (float16) values
+        if not np.isfinite(s).all():
+            row["decode_status"] = "WARN non-finite pixels in float16"
+        q = np.nanpercentile(s, [1, 50, 99])
+        row.update(shape=f"{s.shape[0]}x{s.shape[1]}", min_c=float(np.nanmin(s)), p01_c=float(q[0]),
+                   median_c=float(q[1]), p99_c=float(q[2]), max_c=float(np.nanmax(s)))
+        dst = Path(outroot) / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.stem + ".tmp.npz")
+        np.savez_compressed(tmp, temp_c=h)
+        os.replace(tmp, dst)
+        row.setdefault("decode_status", "OK")
+    except Exception as e:
+        row["decode_status"] = f"FAILED exception {type(e).__name__}: {e}"
+    return row
+
+
+def cmd_exportall(a):
+    """Resumable export of every inventory thermal image as compressed float16 .npz
+    (<outdir>/<flight_id>/<image_stem>.npz, key 'temp_c', shape 512x640) + temperature_index.csv."""
+    from multiprocessing import Pool
+    root = Path(a.dataset)
+    inv = a.inventory or root / "metadata" / "inventory" / "image_inventory.csv"
+    jobs, missing = find_images(root, inv)
+    out = Path(a.outdir or root / "derived" / "thermal_temperature_celsius")
+    out.mkdir(parents=True, exist_ok=True)
+    idx = out / "temperature_index.csv"
+    done = set()
+    if idx.exists():
+        with open(idx, newline="", encoding="utf-8") as fh:
+            for r in csv.DictReader(fh):
+                if r["decode_status"].startswith("OK") and (out / r["rel_path"]).exists():
+                    done.add((r["flight_id"], r["image_id"]))
+    todo = [(f, fl, p, str(out)) for f, fl, p in jobs if (fl, Path(p).stem) not in done]
+    if a.limit:
+        todo = todo[: a.limit]
+    print(f"{len(jobs)} thermal images, {len(done)} already done, {len(todo)} to export, "
+          f"{len(missing)} missing on disk", flush=True)
+    new = not idx.exists()
+    t0 = time.time()
+    with open(idx, "a", newline="", encoding="utf-8") as fh, \
+            Pool(min(a.workers, 4), initializer=_init, initargs=(a.sdk,)) as pool:
+        w = csv.DictWriter(fh, INDEX_COLS, extrasaction="ignore")
+        if new:
+            w.writeheader()
+        for i, row in enumerate(pool.imap(_export_work, todo, chunksize=8), 1):
+            w.writerow({k: (f"{v:.4f}" if isinstance(v, float) else v) for k, v in row.items()})
+            if i % 200 == 0:
+                fh.flush()
+                print(f"  {i}/{len(todo)}  {time.time() - t0:.0f}s", flush=True)
+        for farm, fl, f in missing:
+            w.writerow(dict(image_id=Path(f).stem, farm=farm, flight_id=fl, decode_status="FAILED file missing on disk"))
+    print(f"done in {time.time() - t0:.0f}s -> {idx}", flush=True)
+
+
 def cmd_summary(a):
     """Per-flight and per-hour summaries from thermal_parameters.csv + image_inventory.csv (no SDK needed)."""
     import pandas as pd
@@ -383,6 +458,13 @@ def main():
     s.add_argument("outdir")
     s.add_argument("paths", nargs="+")
     s.set_defaults(fn=cmd_export)
+    s = sub.add_parser("exportall")
+    s.add_argument("--dataset", default=str(Path(__file__).resolve().parents[2] / "dataset"))
+    s.add_argument("--inventory")
+    s.add_argument("--outdir")
+    s.add_argument("--workers", type=int, default=4)
+    s.add_argument("--limit", type=int, default=0)
+    s.set_defaults(fn=cmd_exportall)
     s = sub.add_parser("summary")
     s.add_argument("--dataset", default=str(Path(__file__).resolve().parents[2] / "dataset"))
     s.set_defaults(fn=cmd_summary)

@@ -4,7 +4,7 @@
 Run:  python -X utf8 code/scripts/associate_boxes_to_grid.py [--no-figures]
 
 Reads (never writes):
-  dataset/farm_01_thuan_nam_19/annotations/model2_thermal_anomaly_obb/thermal_boxes.csv
+  dataset/farm_01_thuan_nam_19/annotations/thermal_anomaly_obb/thermal_boxes.csv
   dataset/farm_01_thuan_nam_19/module_reference/TN19_modules_master.gpkg   (table `modules`, EPSG:32649)
   dataset/metadata/grid_audit/registration_windows.csv   (thermal ortho vs 87 m ortho shift windows)
 Writes dataset/metadata/association/ :
@@ -44,7 +44,7 @@ from build_footprints import read_gpkg_layer  # noqa: E402
 
 ROOT = HERE.parent.parent
 FARM = ROOT / "dataset" / "farm_01_thuan_nam_19"
-BOXES = FARM / "annotations" / "model2_thermal_anomaly_obb" / "thermal_boxes.csv"
+BOXES = FARM / "annotations" / "thermal_anomaly_obb" / "thermal_boxes.csv"
 GPKG = FARM / "module_reference" / "TN19_modules_master.gpkg"
 REGWIN = ROOT / "dataset" / "metadata" / "grid_audit" / "registration_windows.csv"
 OUT = ROOT / "dataset" / "metadata" / "association"

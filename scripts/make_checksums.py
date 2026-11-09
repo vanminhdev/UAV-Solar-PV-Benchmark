@@ -11,6 +11,7 @@
 
 Usage: python -X utf8 make_checksums.py [--workers 4] [--verify-only] [--sample 20]   # full run: all farm files (slow, ~120 GB)
        python -X utf8 make_checksums.py --annotations   # re-hash only annotations/, module_reference/, splits/ (keep other lines)
+       python -X utf8 make_checksums.py --derived       # hash dataset/derived/ (decoded temperature matrices)
        python -X utf8 make_checksums.py --metadata      # rewrite provenance/sha256_metadata.txt
 """
 import argparse, hashlib, random, sys, time
@@ -81,6 +82,22 @@ def hash_light(farm):
     print(f"[{farm.name}] {len(new)} light files re-hashed, {len(keep)} lines kept, {len(lines)} total", flush=True)
 
 
+def hash_derived(workers):
+    """Every file under dataset/derived/ -> metadata/checksums/sha256_derived.txt (paths relative to dataset/derived/):
+       cd dataset/derived && sha256sum -c ../metadata/checksums/sha256_derived.txt"""
+    base = ROOT / "derived"
+    files = sorted((p for p in base.rglob("*") if p.is_file()), key=lambda p: p.relative_to(base).as_posix())
+    total = sum(p.stat().st_size for p in files)
+    print(f"[derived] {len(files)} files, {total/1e9:.2f} GB", flush=True)
+    with ThreadPoolExecutor(workers) as ex:
+        hashes = list(ex.map(sha256, files))
+    OUT.mkdir(parents=True, exist_ok=True)
+    with open(OUT / "sha256_derived.txt", "w", encoding="utf-8", newline="\n") as fh:
+        for p, h in zip(files, hashes):
+            fh.write(f"{h}  {p.relative_to(base).as_posix()}\n")
+    print(f"sha256_derived.txt: {len(files)} files", flush=True)
+
+
 def hash_metadata():
     files = []
     for top in ("metadata", "provenance"):
@@ -120,8 +137,12 @@ def main():
     ap.add_argument("--verify-only", action="store_true")
     ap.add_argument("--annotations", action="store_true", help="re-hash annotations/, module_reference/, splits/ only")
     ap.add_argument("--metadata", action="store_true", help="rewrite provenance/sha256_metadata.txt only")
+    ap.add_argument("--derived", action="store_true", help="hash dataset/derived/ -> metadata/checksums/sha256_derived.txt")
     a = ap.parse_args()
     farms = sorted(p for p in ROOT.glob("farm_*") if p.is_dir())
+    if a.derived:
+        hash_derived(a.workers)
+        return
     if a.annotations or a.metadata:
         if a.annotations:
             for farm in farms:

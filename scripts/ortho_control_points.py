@@ -258,7 +258,7 @@ def crosscheck(tr):
     """Our image-based ortho->base shift vs association/thermal_box_to_cell.csv (reg + drift) and registration_used.csv, at the box centres."""
     from orthoreg_register import apply_fit
     a = pd.read_csv(DS / 'metadata/association/thermal_box_to_cell.csv')
-    bx = pd.concat([pd.read_csv(f) for f in sorted(DS.glob('farm_*/annotations/model2_thermal_anomaly_obb/thermal_boxes.csv'))]).set_index('box_id')
+    bx = pd.concat([pd.read_csv(f) for f in sorted(DS.glob('farm_*/annotations/thermal_anomaly_obb/thermal_boxes.csv'))]).set_index('box_id')
     ru = pd.read_csv(DS / 'metadata/association/registration_used.csv').set_index('flight_id'); rows = []
     for f, g in a.groupby('flight_id'):
         r = tr[(tr.flight_id == f) & (tr.is_primary == 1)]
@@ -351,8 +351,8 @@ def apply_chain(flight_id, thermal_file, x_px, y_px, dataset=None, height='relat
 def cmd_test():
     tr, inv, ds = _tables()
     a = pd.read_csv(ds / 'metadata/association/thermal_box_to_cell.csv'); a = a[a.status == 'unique']
-    det = pd.concat([pd.read_csv(f) for f in sorted(ds.glob('farm_01*/annotations/model2_thermal_anomaly_obb/thermal_box_frame_detections.csv'))])
-    bx = pd.concat([pd.read_csv(f) for f in sorted(ds.glob('farm_01*/annotations/model2_thermal_anomaly_obb/thermal_boxes.csv'))]).set_index('box_id')
+    det = pd.concat([pd.read_csv(f) for f in sorted(ds.glob('farm_01*/annotations/thermal_anomaly_obb/thermal_box_frame_detections.csv'))])
+    bx = pd.concat([pd.read_csv(f) for f in sorted(ds.glob('farm_01*/annotations/thermal_anomaly_obb/thermal_boxes.csv'))]).set_index('box_id')
     g, geoms, tree = _cells(ds); idx = {m: i for i, m in enumerate(g.module_id)}
     d = det.merge(a[['box_id', 'module_id']], on='box_id'); d = d[d.flight_id.isin(tr.index)]
     d = d[d.flight_id.map(lambda f: tr.loc[f, 'model'] != 'none')]

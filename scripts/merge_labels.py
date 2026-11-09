@@ -8,7 +8,7 @@ image), created and verified by one human annotator:
     tt = 'dung' -> confirmed, 'sai' -> rejected, null -> not individually flagged.
 Project decision: boxes not individually flagged are accepted like confirmed ones and released as one set (no review_status
 column). The released tables carry ONE class column (class_final); no preliminary class or score fields are written.
-Outputs (per farm, in annotations/model2_thermal_anomaly_obb/):
+Outputs (per farm, in annotations/thermal_anomaly_obb/):
     thermal_boxes.csv                  one row per box, corners in EPSG:32649
     thermal_box_frame_detections.csv   per box and per raw thermal frame: centre pixel
 Only released boxes are written: confirmed + unreviewed (rejected boxes are dropped;
@@ -82,7 +82,7 @@ def main():
                     flight_id=fid, box_id=row["box_id"], seq=int(fr), thermal_file=seqfile.get((fid, int(fr)), ""),
                     x_px=x, y_px=y))
     for farm, rows in boxes.items():
-        out = ds / farm / "annotations" / "model2_thermal_anomaly_obb"
+        out = ds / farm / "annotations" / "thermal_anomaly_obb"
         out.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(rows).to_csv(out / "thermal_boxes.csv", index=False)
         pd.DataFrame(frames[farm]).to_csv(out / "thermal_box_frame_detections.csv", index=False)

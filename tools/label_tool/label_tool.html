@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Công cụ Gán nhãn Ảnh Nhiệt Định hướng (Oriented Box)</title>
+<style>
+  :root { --bg-app: #0f172a; --bg-panel: #1e293b; --bg-card: #263349; --bg-input: #0b1120; --bg-hover: #334155; --text-main: #f1f5f9; --text-muted: #94a3b8; --border-color: #334155; --primary: #3b82f6; --primary-hover: #2563eb; --success: #10b981; --success-hover: #059669; --warning: #f59e0b; --danger: #e11d48; --danger-hover: #be123c; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow-x: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-app); color: var(--text-main); font-size: 14px; line-height: 1.45; user-select: none; }
+  /* Warning Banner for IndexedDB fallback */
+  .idb-warning { display: none; background-color: #7f1d1d; color: #fecaca; border-bottom: 2px solid var(--danger); padding: 10px 16px; font-weight: 600; text-align: center; font-size: 13px; }
+  .idb-warning.visible { display: block; }
+  /* Screen Containers */
+  .screen { display: none; width: 100%; height: 100vh; overflow-x: hidden; }
+  .screen.active { display: flex; flex-direction: column; }
+  body.has-idb-warning .screen.active { height: calc(100vh - 42px); }
+  /* Buttons & Inputs */
+  button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-card); color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background-color 0.15s, border-color 0.15s, opacity 0.15s; }
+  button:hover:not(:disabled) { background-color: var(--bg-hover); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background-color: var(--primary); border-color: var(--primary); color: #ffffff; }
+  .btn-primary:hover:not(:disabled) { background-color: var(--primary-hover); }
+  .btn-success { background-color: var(--success); border-color: var(--success); color: #ffffff; }
+  .btn-success:hover:not(:disabled) { background-color: var(--success-hover); }
+  .btn-danger { background-color: var(--danger); border-color: var(--danger); color: #ffffff; }
+  .btn-danger:hover:not(:disabled) { background-color: var(--danger-hover); }
+  .btn-warning { background-color: #d97706; border-color: #d97706; color: #ffffff; }
+  .btn-sm { min-height: 30px; padding: 4px 9px; font-size: 12px; }
+  input[type="text"], textarea { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--text-main); font-size: 13px; font-family: inherit; user-select: text; }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--primary); }
+  input.input-error { border-color: var(--danger); }
+  .field-error { min-height: 18px; font-size: 12px; color: #fda4af; margin-top: 3px; }
+  /* Start Screen */
+  .center-card-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
+  .start-card { width: 100%; max-width: 560px; background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 28px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+  .start-card h1 { font-size: 20px; margin-bottom: 8px; }
+  .start-card p { color: var(--text-muted); margin-bottom: 20px; }
+  .start-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .start-actions button { min-height: 46px; font-size: 14px; }
+  .start-hint { background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 12.5px; color: var(--text-muted); }
+  /* Session Screen */
+  .session-container { max-width: 980px; width: 100%; margin: 0 auto; padding: 24px; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+  .top-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color); }
+  .top-header h2 { font-size: 18px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dataset-summary { background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .session-list { display: flex; flex-direction: column; gap: 12px; }
+  .session-item { background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .session-meta h3 { font-size: 16px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .session-meta p { font-size: 12.5px; color: var(--text-muted); }
+  .session-buttons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .other-sessions-note { margin-top: 14px; font-size: 12.5px; color: var(--text-muted); font-style: italic; }
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-open { background-color: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+  .badge-final { background-color: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+  .badge-todo { background-color: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+  .badge-done { background-color: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+  .badge-clean { background-color: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+  .badge-note { background-color: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+  /* Work Screen Layout */
+  .work-topbar { height: 48px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+  .work-topbar-left, .work-topbar-right { display: flex; align-items: center; gap: 8px; }
+  .save-indicator { font-size: 12px; padding: 3px 8px; border-radius: 4px; background-color: var(--bg-input); color: #6ee7b7; border: 1px solid var(--border-color); white-space: nowrap; }
+  .save-indicator.saving { color: #fcd34d; }
+  .work-main { flex: 1; display: grid; grid-template-columns: 270px 1fr 310px; min-height: 0; overflow: hidden; }
+  /* Left Panel */
+  .panel-left { background-color: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; min-height: 0; }
+  .panel-section-head { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; }
+  .filter-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; padding: 8px; border-bottom: 1px solid var(--border-color); }
+  .filter-bar button { min-height: 28px; font-size: 11.5px; padding: 2px 6px; }
+  .filter-bar button.active { background-color: var(--primary); border-color: var(--primary); color: #ffffff; }
+  .image-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .image-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 9px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; background-color: rgba(15, 23, 42, 0.35); }
+  .image-row:hover { background-color: var(--bg-card); }
+  .image-row.active { background-color: rgba(59, 130, 246, 0.22); border-color: var(--primary); }
+  .image-row-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .image-row-badges { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  /* Center Panel (Canvas + Toolbar) */
+  .panel-center { display: flex; flex-direction: column; min-width: 0; min-height: 0; background-color: #090d16; }
+  .canvas-toolbar { padding: 6px 12px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .tool-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tool-btn.active { background-color: var(--primary); border-color: var(--primary); color: #ffffff; }
+  .slider-control { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .slider-control input[type="range"] { width: 76px; cursor: pointer; }
+  .canvas-viewport { flex: 1; position: relative; overflow: hidden; cursor: crosshair; }
+  .canvas-viewport.mode-select { cursor: default; }
+  .canvas-viewport.panning { cursor: grabbing; }
+  .canvas-notice { display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(15, 23, 42, 0.94); color: #fde68a; border: 1px solid var(--warning); border-radius: 6px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; pointer-events: none; z-index: 20; white-space: nowrap; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+  .canvas-notice.visible { display: block; }
+  .ai-banner { display: none; padding: 4px 12px; background-color: rgba(59, 130, 246, 0.14); border-bottom: 1px solid rgba(59, 130, 246, 0.35); color: #bfdbfe; font-size: 12px; text-align: center; }
+  .ai-banner.visible { display: block; }
+  .box-tag-ai { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; background-color: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.45); }
+  #workCanvas { display: block; width: 100%; height: 100%; }
+  .canvas-statusbar { padding: 5px 12px; background-color: var(--bg-panel); border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  /* Right Panel */
+  .panel-right { background-color: var(--bg-panel); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .right-block { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+  .right-block-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; }
+  .class-grid { display: flex; flex-direction: column; gap: 6px; }
+  .class-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 34px; padding: 5px 10px; border-radius: 6px; border: 2px solid transparent; background-color: var(--bg-input); text-align: left; }
+  .class-btn.active { border-color: #ffffff; background-color: var(--bg-card); }
+  .class-swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+  .class-label-wrap { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+  .class-key { font-size: 11px; padding: 1px 6px; border-radius: 4px; background-color: var(--bg-panel); color: var(--text-muted); border: 1px solid var(--border-color); }
+  .box-list { max-height: 150px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 4px; }
+  .box-item { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 6px; background-color: var(--bg-input); border: 1px solid transparent; cursor: pointer; font-size: 12.5px; }
+  .box-item.selected { border-color: var(--primary); background-color: rgba(59, 130, 246, 0.18); }
+  .action-stack { display: flex; flex-direction: column; gap: 6px; }
+  .action-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  /* Three-Tier Sticky Modal System */
+  .modal-backdrop { display: none; position: fixed; inset: 0; background-color: rgba(9, 13, 22, 0.72); z-index: 90; align-items: center; justify-content: center; padding: 16px; }
+  .modal-backdrop.open { display: flex; }
+  .modal-dialog { width: 100%; max-width: 460px; max-height: calc(100vh - 32px); background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); overflow: hidden; }
+  .modal-dialog.modal-lg { max-width: 600px; }
+  .modal-header { padding: 14px 18px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-header h3 { font-size: 16px; }
+  .modal-body { padding: 16px 18px; overflow-y: auto; overflow-x: hidden; flex: 1; }
+  .modal-footer { padding: 12px 18px; border-top: 1px solid var(--border-color); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0; }
+  .modal-footer button { min-height: 40px; width: 100%; }
+  .todo-warning-list { max-height: 150px; overflow-y: auto; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 10px; margin: 10px 0; font-family: monospace; font-size: 12px; }
+  .validation-box { background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12.5px; }
+  .validation-ok { color: #6ee7b7; }
+  .validation-err { color: #fda4af; }
+</style>
+</head>
+<body>
+
+<div id="idbWarningBanner" class="idb-warning">
+  Cảnh báo: Trình duyệt hiện chặn bộ nhớ cục bộ (IndexedDB). Phiên làm việc sẽ KHÔNG tự lưu khi đóng tab — vui lòng dùng nút "Sao lưu phiên (.json)" trước khi thoát!
+</div>
+
+<!-- SCREEN 1: START SCREEN -->
+<section id="startScreen" class="screen active">
+  <div class="center-card-wrap">
+    <div class="start-card"> <h1>Công cụ Gán nhãn Ảnh Nhiệt Định hướng</h1>
+      <p>Vui lòng chọn thư mục chứa ảnh hoặc chọn danh sách tệp ảnh (.jpg, .jpeg, .png) để bắt đầu phiên gán nhãn.</p>
+      <div class="start-actions">
+        <button type="button" id="btnPickFolder" class="btn-primary">Chọn thư mục ảnh</button>
+        <button type="button" id="btnPickFiles">Chọn ảnh</button> </div>
+      <input type="file" id="inputFolder" webkitdirectory directory multiple style="display:none">
+      <input type="file" id="inputFiles" multiple accept=".jpg,.jpeg,.png,.txt" style="display:none">
+      <div class="start-hint"> <strong>Hướng dẫn nhanh:</strong><br>
+        • Hỗ trợ đọc tệp <code>classes.txt</code> nếu có trong thư mục hoặc danh sách tệp đã chọn.<br>
+        • Công cụ vẽ: <code>N</code> vẽ chữ nhật 3 điểm, <code>Q</code> vẽ tứ giác 4 đỉnh tự do.<br>
+        • Chế độ sửa (<code>V</code>): kéo tự do từng đỉnh (giữ <code>Shift</code> khi kéo góc để giữ hình chữ nhật), nhấn <code>R</code> để ép thành chữ nhật.<br>
+        • Ảnh chỉ được giữ trong bộ nhớ tạm khi làm việc; nhãn và nhật ký lưu tự động theo từng phiên. </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 2: SESSION LIST SCREEN -->
+<section id="sessionScreen" class="screen">
+  <div class="session-container">
+    <div class="top-header"> <div>
+        <h2>Quản lý Phiên Gán nhãn</h2>
+        <p id="datasetInfoText" style="color:var(--text-muted); font-size:13px;"></p> </div>
+      <div class="header-actions">
+        <button type="button" id="btnChangeImages" class="btn-sm">Đổi bộ ảnh khác</button>
+        <button type="button" id="btnImportBackup" class="btn-sm">Nạp sao lưu (.json)</button>
+        <input type="file" id="inputBackupFile" accept=".json" style="display:none">
+        <button type="button" id="btnOpenCreateSession" class="btn-primary">+ Tạo phiên mới</button>
+      </div> </div>
+
+    <div id="sessionListContainer" class="session-list"></div>
+    <div id="otherSessionsNote" class="other-sessions-note"></div>
+  </div>
+</section>
+
+<!-- SCREEN 3: WORK SCREEN -->
+<section id="workScreen" class="screen">
+  <div class="work-topbar">
+    <div class="work-topbar-left">
+      <button type="button" id="btnBackToSessions" class="btn-sm">← Danh sách phiên</button>
+      <strong id="workSessionTitle">Phiên: --</strong>
+      <span id="workSessionBadge" class="badge badge-open">Đang mở</span>
+      <span id="saveStatusIndicator" class="save-indicator">Đã lưu</span> </div>
+    <div class="work-topbar-right">
+      <label for="sessionCommentInput" style="font-size:12px; color:var(--text-muted);">Ghi chú phiên:</label>
+      <input type="text" id="sessionCommentInput" placeholder="Ghi chú ca làm việc hiện tại..." style="width:210px; padding:5px 8px;">
+      <button type="button" id="btnPickDraftDir" class="btn-sm" title="Chọn một thư mục (chỉ Chrome / Edge). Sau đó công cụ tự lưu bản nháp .zip và sao lưu .json vào thư mục đó sau mỗi thay đổi, không khóa phiên.">Thư mục lưu nháp</button>
+      <button type="button" id="btnBackupCurrentSession" class="btn-sm">Sao lưu phiên (.json)</button>
+      <button type="button" id="btnExportFromWork" class="btn-primary btn-sm">Xuất kết quả (.zip)</button>
+    </div>
+  </div>
+
+  <div class="work-main">
+    <!-- Left Panel: Image List & Filters -->
+    <aside class="panel-left"> <div class="panel-section-head">
+        <span>Danh sách ảnh</span> <span id="completionCounter">0 / 0 hoàn thành</span>
+      </div> <div class="filter-bar">
+        <button type="button" data-filter="all" class="filter-btn active">Tất cả</button>
+        <button type="button" data-filter="todo" class="filter-btn">Chưa làm</button>
+        <button type="button" data-filter="done" class="filter-btn">Đã xong</button>
+        <button type="button" data-filter="note" class="filter-btn">Có ghi chú</button> </div>
+      <div id="imageListEl" class="image-list"></div> </aside>
+
+    <!-- Centre Panel: Canvas & Display Controls -->
+    <main class="panel-center"> <div class="canvas-toolbar">
+        <div class="tool-group">
+          <button type="button" id="btnToolDraw" class="btn-sm tool-btn active" title="Phím N: Vẽ khung chữ nhật định hướng 3 bước">Vẽ box (N)</button>
+          <button type="button" id="btnToolQuad" class="btn-sm tool-btn" title="Phím Q: Vẽ tứ giác 4 đỉnh tự do">Tứ giác (Q)</button>
+          <button type="button" id="btnToolSelect" class="btn-sm tool-btn" title="Phím V: Chọn, di chuyển, xoay hoặc kéo từng đỉnh (giữ Shift để giữ chữ nhật)">Chọn / Sửa (V)</button>
+          <button type="button" id="btnFitView" class="btn-sm" title="Phím F hoặc nhấp đúp: Vừa khung hình">Vừa khung (F)</button>
+          <button type="button" id="btnLabelMode" class="btn-sm" title="Phím L: đổi cách hiện nhãn trên box (nhỏ gọn / ẩn / đầy đủ)">Nhãn: nhỏ (L)</button>
+          <button type="button" id="btnOutlineOnly" class="btn-sm" title="Phím O: chỉ vẽ viền box, không tô màu bên trong, để nhìn rõ ảnh bên dưới">Chỉ viền (O)</button>
+        </div> <div class="tool-group">
+          <label class="slider-control">
+            Độ sáng <input type="range" id="sliderBrightness" min="30" max="220" value="100"> </label>
+          <label class="slider-control">
+            Độ tương phản <input type="range" id="sliderContrast" min="30" max="250" value="100">
+          </label> <button type="button" id="btnInvertFilter" class="btn-sm">Đảo độ sáng</button>
+          <button type="button" id="btnResetFilter" class="btn-sm">Đặt lại</button> </div>
+      </div>
+
+      <div id="aiSuggestBanner" class="ai-banner">Ảnh này có box do AI gợi ý (nét đứt). Hãy kiểm tra và chỉnh sửa từng box.</div>
+
+      <div id="canvasViewport" class="canvas-viewport">
+        <div id="canvasNotice" class="canvas-notice"></div>
+        <canvas id="workCanvas"></canvas>
+      </div>
+
+      <div class="canvas-statusbar">
+        <span id="drawHintText">Chế độ Vẽ (N): Nhấp 3 điểm để vẽ chữ nhật (Q: tứ giác 4 đỉnh, V: kéo đỉnh/Shift giữ chữ nhật, R: ép thành chữ nhật).</span>
+        <span id="cursorCoordText">Tọa độ: -- | Thu phóng: 100%</span> </div>
+    </main>
+
+    <!-- Right Panel: Classes, Boxes, Image Note, Actions -->
+    <aside class="panel-right"> <div class="right-block">
+        <div class="right-block-title">Lớp đối tượng (Phím 1 - 4)</div>
+        <div id="classButtonsContainer" class="class-grid"></div> </div>
+
+      <div class="right-block">
+        <div class="right-block-title">Danh sách Box trên ảnh (<span id="boxCountLabel">0</span>)</div>
+        <div id="boxListContainer" class="box-list"></div>
+        <button type="button" id="btnSquareUp" class="btn-sm" style="width:100%; margin-top:6px;" title="Phím R: Ép đa giác đang chọn thành hình chữ nhật bao diện tích nhỏ nhất">Ép thành chữ nhật (R)</button>
+      </div>
+
+      <div class="right-block"> <div class="right-block-title">Ghi chú ca phân vân</div>
+        <textarea id="imageNoteInput" rows="2" placeholder="Nhập ghi chú cho ảnh này (nếu có)..."></textarea>
+      </div>
+
+      <div class="right-block" style="border-bottom:none;">
+        <div class="right-block-title">Thao tác ảnh hiện tại</div> <div class="action-stack">
+          <button type="button" id="btnMarkDone" class="btn-success">Hoàn thành ảnh (Enter)</button>
+          <button type="button" id="btnMarkNoFault" class="btn-primary">Ảnh này không có lỗi (E)</button>
+          <div class="action-row-2">
+            <button type="button" id="btnUndo" title="Ctrl+Z">Hoàn tác (Ctrl+Z)</button>
+            <button type="button" id="btnRedo" title="Ctrl+Y">Tiến lại (Ctrl+Y)</button> </div>
+          <button type="button" id="btnResetImage" class="btn-danger">Làm lại ảnh này</button> </div>
+      </div> </aside>
+  </div>
+</section>
+
+<!-- UNIVERSAL MODAL -->
+<div id="modalBackdrop" class="modal-backdrop">
+  <div id="modalDialog" class="modal-dialog">
+    <div class="modal-header"> <h3 id="modalTitle">Thông báo</h3>
+    </div> <div id="modalBody" class="modal-body"></div>
+    <div id="modalFooter" class="modal-footer"> <button type="button" id="modalBtnCancel">Hủy bỏ</button>
+      <button type="button" id="modalBtnConfirm" class="btn-primary">Xác nhận</button> </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+ * SECTION 1: EMBEDDED PLACEHOLDERS, CONSTANTS & GLOBAL STATE
+ * ============================================================================ */
+const EMBEDDED_IMAGES = /*EMBEDDED_IMAGES*/ null;
+const EMBEDDED_CLASSES = /*EMBEDDED_CLASSES*/ null;
+const EMBEDDED_CODE = /*EMBEDDED_CODE*/ "";
+const DEFAULT_CLASSES = [
+  "SingleHotSpot", "MultiHotSpot", "Bypass", "ModuleOpenCircuit"
+];
+const HUONG_DAN = "Hướng dẫn: N vẽ chữ nhật 3 điểm; Q vẽ tứ giác 4 đỉnh; V chọn/sửa và kéo tự do từng đỉnh (giữ Shift khi kéo góc để giữ hình chữ nhật); R ép tứ giác đang chọn thành chữ nhật.";
+const CLASS_COLORS = [
+  "#ef4444", "#f59e0b", "#10b981", "#38bdf8", "#a855f7", "#ec4899"
+];
+const DB_NAME = "labeltool";
+const DB_VERSION = 1;
+const STORE_SESSIONS = "sessions";
+const IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const HANDLE_RADIUS_PX = 6; // 12px diameter >= 10 screen px requirement
+const ROTATE_HANDLE_OFFSET_PX = 26;
+
+const state = {
+  classes: DEFAULT_CLASSES.slice(), presetCode: EMBEDDED_CODE || "",
+  images: [], imageMap: {},
+  imageSetKey: "", sessions: [],
+  currentSession: null, currentImageIndex: 0, currentFilter: "all", activeClass: 0,
+  selectedBoxIndex: -1, activeTool: "draw", forceNextDraw: false,
+  // Canvas view & filter state
+  zoom: 1, panX: 0, panY: 0, brightness: 100,
+  contrast: 100, invert: false,
+  // Interactive drawing / dragging state
+  drawStep: 0, drawP1: null,
+  drawP2: null, quadPts: [], mouseImgPos: { x: 0, y: 0 },
+  dragAction: null, spacePressed: false, noticeTimer: null, noticeMessage: "",
+  labelMode: 0, outlineOnly: false, boxesHidden: false,
+  // Per-image undo/redo stacks: imageId -> { undo: [], redo: [] }
+  historyByImage: {},
+  // Time logging state for current open session
+  activeInterval: null, lastActivityTs: Date.now()
+};
+
+/* ============================================================================
+ * SECTION 2: HASHING, GEOMETRY & FORMATTING HELPERS
+ * ============================================================================ */
+function computeImageSetKey(imageIds) {
+  const sorted = imageIds.slice().sort(); const joined = sorted.join("|"); let h1 = 0x811c9dc5;
+  for (let i = 0; i < joined.length; i++) { h1 ^= joined.charCodeAt(i); h1 = Math.imul(h1, 0x01000193) >>> 0; }
+  return sorted.length + "_" + h1.toString(16).padStart(8, "0");
+}
+function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+function dist2D(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
+function boxCenter(pts) {
+  return [ (pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) / 4,
+    (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) / 4 ];
+}
+// Compute 4 vertices of an oriented rectangle from P1, P2, and cursor P3
+function computeOrientedBoxFrom3Points(p1, p2, p3) {
+  const dx = p2[0] - p1[0]; const dy = p2[1] - p1[1]; const len = Math.hypot(dx, dy); if (len < 1e-3) {
+    return [ [p1[0], p1[1]], [p1[0] + 1, p1[1]], [p1[0] + 1, p1[1] + 1],
+      [p1[0], p1[1] + 1] ]; } const ux = dx / len;
+  const uy = dy / len; const nx = -uy; const ny = ux; const w = (p3[0] - p1[0]) * nx + (p3[1] - p1[1]) * ny;
+  return [ [p1[0], p1[1]], [p2[0], p2[1]], [p2[0] + nx * w, p2[1] + ny * w],
+    [p1[0] + nx * w, p1[1] + ny * w] ];
+}
+// Resize corner `cornerIdx` keeping `(cornerIdx + 2) % 4` fixed in the box's rotated frame
+function resizeBoxCorner(pts, cornerIdx, newCornerPt) {
+  const oppIdx = (cornerIdx + 2) % 4; const nextIdx = (oppIdx + 1) % 4; const prevIdx = (oppIdx + 3) % 4;
+  const opp = pts[oppIdx]; let ux = pts[nextIdx][0] - opp[0];
+  let uy = pts[nextIdx][1] - opp[1]; const uLen = Math.hypot(ux, uy);
+  if (uLen > 1e-4) { ux /= uLen; uy /= uLen; } else { ux = 1; uy = 0; }
+  let vx = pts[prevIdx][0] - opp[0]; let vy = pts[prevIdx][1] - opp[1];
+  const vLen = Math.hypot(vx, vy); if (vLen > 1e-4) { vx /= vLen; vy /= vLen; } else { vx = -uy; vy = ux;
+  }
+  const dx = newCornerPt[0] - opp[0]; const dy = newCornerPt[1] - opp[1];
+  let projU = dx * ux + dy * uy; let projV = dx * vx + dy * vy;
+  if (Math.abs(projU) < 2) projU = (projU >= 0 ? 1 : -1) * 2;
+  if (Math.abs(projV) < 2) projV = (projV >= 0 ? 1 : -1) * 2;
+  const result = [[0, 0], [0, 0], [0, 0], [0, 0]]; result[oppIdx] = [opp[0], opp[1]];
+  result[nextIdx] = [opp[0] + ux * projU, opp[1] + uy * projU];
+  result[cornerIdx] = [opp[0] + ux * projU + vx * projV, opp[1] + uy * projU + vy * projV];
+  result[prevIdx] = [opp[0] + vx * projV, opp[1] + vy * projV]; return result;
+}
+// Rotate all 4 vertices around center by deltaAngle (radians)
+function rotateBoxPoints(pts, deltaAngle) {
+  const c = boxCenter(pts); const cosA = Math.cos(deltaAngle);
+  const sinA = Math.sin(deltaAngle); return pts.map(function (pt) {
+    const rx = pt[0] - c[0]; const ry = pt[1] - c[1]; return [ c[0] + rx * cosA - ry * sinA,
+      c[1] + rx * sinA + ry * cosA ]; });
+}
+// Compute position of the rotation handle in image coordinates
+function getRotationHandlePos(pts, zoom) {
+  const midX = (pts[0][0] + pts[1][0]) / 2; const midY = (pts[0][1] + pts[1][1]) / 2;
+  const c = boxCenter(pts); let vx = midX - c[0]; let vy = midY - c[1]; const len = Math.hypot(vx, vy);
+  if (len > 1e-4) { vx /= len; vy /= len; } else { vx = 0; vy = -1; }
+  const offsetImg = ROTATE_HANDLE_OFFSET_PX / (zoom || 1);
+  return [midX + vx * offsetImg, midY + vy * offsetImg];
+}
+// Point-in-polygon check for any simple 4-vertex quadrilateral (convex or concave)
+function pointInQuad(pt, quad) {
+  let inside = false; const x = pt[0]; const y = pt[1];
+  for (let i = 0, j = quad.length - 1; i < quad.length; j = i++) {
+    const xi = quad[i][0]; const yi = quad[i][1];
+    const xj = quad[j][0]; const yj = quad[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+function polygonSignedArea(pts) {
+  let sum = 0; const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const a = pts[i]; const b = pts[(i + 1) % n];
+    sum += a[0] * b[1] - b[0] * a[1];
+  }
+  return sum * 0.5;
+}
+function polygonArea(pts) {
+  return Math.abs(polygonSignedArea(pts));
+}
+function ccwVal(a, b, c) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+function pointOnSegment(p, a, b, eps) {
+  const tol = eps || 1e-6;
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < 1e-9) return Math.hypot(p[0] - a[0], p[1] - a[1]) <= tol;
+  if (Math.abs(ccwVal(a, b, p)) / len > tol) return false;
+  return p[0] >= Math.min(a[0], b[0]) - tol && p[0] <= Math.max(a[0], b[0]) + tol &&
+         p[1] >= Math.min(a[1], b[1]) - tol && p[1] <= Math.max(a[1], b[1]) + tol;
+}
+function segmentsIntersect(a, b, c, d) {
+  const d1 = ccwVal(a, b, c); const d2 = ccwVal(a, b, d);
+  const d3 = ccwVal(c, d, a); const d4 = ccwVal(c, d, b);
+  if (((d1 > 1e-7 && d2 < -1e-7) || (d1 < -1e-7 && d2 > 1e-7)) &&
+      ((d3 > 1e-7 && d4 < -1e-7) || (d3 < -1e-7 && d4 > 1e-7))) {
+    return true;
+  }
+  if (pointOnSegment(c, a, b, 1e-4) || pointOnSegment(d, a, b, 1e-4) ||
+      pointOnSegment(a, c, d, 1e-4) || pointOnSegment(b, c, d, 1e-4)) {
+    return true;
+  }
+  return false;
+}
+// Validate that a 4-vertex polygon is simple (non self-crossing) and has area >= minArea (default 4 px^2)
+function isSimpleQuad(pts, minArea) {
+  if (!pts || pts.length !== 4) return false;
+  const reqArea = minArea != null ? minArea : 4;
+  for (let i = 0; i < 4; i++) {
+    const a = pts[i]; const b = pts[(i + 1) % 4];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1) return false;
+  }
+  if (segmentsIntersect(pts[0], pts[1], pts[2], pts[3])) return false;
+  if (segmentsIntersect(pts[1], pts[2], pts[3], pts[0])) return false;
+  for (let i = 0; i < 4; i++) {
+    const prev = pts[(i + 3) % 4]; const cur = pts[i]; const next = pts[(i + 1) % 4];
+    const ux = prev[0] - cur[0]; const uy = prev[1] - cur[1];
+    const vx = next[0] - cur[0]; const vy = next[1] - cur[1];
+    const denom = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+    if (denom < 1e-6) return false;
+    const sinA = Math.abs(ux * vy - uy * vx) / denom;
+    if (sinA < 1e-3) return false;
+  }
+  return polygonArea(pts) >= reqArea;
+}
+function isRectangle(pts) {
+  if (!pts || pts.length !== 4) return false;
+  for (let i = 0; i < 4; i++) {
+    const a = pts[i]; const b = pts[(i + 1) % 4]; const c = pts[(i + 2) % 4];
+    const ux = b[0] - a[0]; const uy = b[1] - a[1];
+    const vx = c[0] - b[0]; const vy = c[1] - b[1];
+    const uLen = Math.hypot(ux, uy); const vLen = Math.hypot(vx, vy);
+    if (uLen < 1e-3 || vLen < 1e-3) return false;
+    const cosA = Math.abs(ux * vx + uy * vy) / (uLen * vLen);
+    if (cosA > 0.015) return false;
+  }
+  return true;
+}
+// Convex hull (Andrew's monotone chain)
+function convexHull(points) {
+  if (!points || points.length === 0) return [];
+  const sorted = points.slice().sort(function (a, b) {
+    return a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1];
+  });
+  const unique = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = unique[unique.length - 1];
+    if (Math.hypot(sorted[i][0] - last[0], sorted[i][1] - last[1]) > 1e-6) {
+      unique.push(sorted[i]);
+    }
+  }
+  if (unique.length <= 2) return unique;
+  const lower = [];
+  for (let i = 0; i < unique.length; i++) {
+    while (lower.length >= 2 && ccwVal(lower[lower.length - 2], lower[lower.length - 1], unique[i]) <= 0) {
+      lower.pop();
+    }
+    lower.push(unique[i]);
+  }
+  const upper = [];
+  for (let i = unique.length - 1; i >= 0; i--) {
+    while (upper.length >= 2 && ccwVal(upper[upper.length - 2], upper[upper.length - 1], unique[i]) <= 0) {
+      upper.pop();
+    }
+    upper.push(unique[i]);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+// Minimum-area enclosing rectangle via rotating calipers over the convex hull
+function minAreaEnclosingRect(points, expandPx) {
+  const exp = expandPx || 0;
+  const hull = convexHull(points);
+  if (hull.length === 0) {
+    return [[0, 0], [2, 0], [2, 2], [0, 2]];
+  }
+  if (hull.length === 1) {
+    const x = hull[0][0]; const y = hull[0][1]; const r = Math.max(1, exp);
+    return [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
+  }
+  let bestArea = Infinity;
+  let bestParams = null;
+  const n = hull.length;
+  for (let i = 0; i < n; i++) {
+    const pA = hull[i]; const pB = hull[(i + 1) % n];
+    const dx = pB[0] - pA[0]; const dy = pB[1] - pA[1];
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue;
+    const ux = dx / len; const uy = dy / len;
+    const vx = -uy; const vy = ux;
+    let minU = Infinity; let maxU = -Infinity;
+    let minV = Infinity; let maxV = -Infinity;
+    for (let j = 0; j < n; j++) {
+      const u = hull[j][0] * ux + hull[j][1] * uy;
+      const v = hull[j][0] * vx + hull[j][1] * vy;
+      if (u < minU) minU = u;
+      if (u > maxU) maxU = u;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    const area = (maxU - minU) * (maxV - minV);
+    if (area < bestArea) {
+      bestArea = area;
+      bestParams = { ux: ux, uy: uy, vx: vx, vy: vy, minU: minU, maxU: maxU, minV: minV, maxV: maxV };
+    }
+  }
+  if (!bestParams) {
+    const x = hull[0][0]; const y = hull[0][1];
+    return [[x - 1, y - 1], [x + 1, y - 1], [x + 1, y + 1], [x - 1, y + 1]];
+  }
+  const minU = bestParams.minU - exp; const maxU = bestParams.maxU + exp;
+  const minV = bestParams.minV - exp; const maxV = bestParams.maxV + exp;
+  const ux = bestParams.ux; const uy = bestParams.uy;
+  const vx = bestParams.vx; const vy = bestParams.vy;
+  return [
+    [ux * minU + vx * minV, uy * minU + vy * minV],
+    [ux * maxU + vx * minV, uy * maxU + vy * minV],
+    [ux * maxU + vx * maxV, uy * maxU + vy * maxV],
+    [ux * minU + vx * maxV, uy * minU + vy * maxV]
+  ];
+}
+// Replace a 4-vertex polygon with its minimum-area enclosing rectangle preserving vertex winding/start
+function squareUpQuadPoints(pts) {
+  let rect = minAreaEnclosingRect(pts, 0);
+  const origSign = Math.sign(polygonSignedArea(pts));
+  const rectSign = Math.sign(polygonSignedArea(rect));
+  if (origSign !== 0 && rectSign !== 0 && origSign !== rectSign) {
+    rect = [rect[0], rect[3], rect[2], rect[1]];
+  }
+  let bestShift = 0;
+  let bestDist = Infinity;
+  for (let s = 0; s < 4; s++) {
+    const d = dist2D(rect[s], pts[0]);
+    if (d < bestDist) { bestDist = d; bestShift = s; }
+  }
+  const aligned = [];
+  for (let i = 0; i < 4; i++) {
+    aligned.push(rect[(bestShift + i) % 4]);
+  }
+  return aligned;
+}
+// Format a single box into normalized YOLO-OBB line: class_id x1 y1 x2 y2 x3 y3 x4 y4
+function formatBoxLine(box, imgWidth, imgHeight) {
+  const w = imgWidth > 0 ? imgWidth : 640; const h = imgHeight > 0 ? imgHeight : 512;
+  const parts = [String(box.cls)]; for (let i = 0; i < 4; i++) {
+    const nx = clamp(box.pts[i][0] / w, 0, 1).toFixed(6);
+    const ny = clamp(box.pts[i][1] / h, 0, 1).toFixed(6); parts.push(nx, ny); } return parts.join(" ");
+}
+function csvEscape(field) {
+  const str = String(field == null ? "" : field);
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return '"' + str.replace(/"/g, '""') + '"'; } return str;
+}
+function formatDateYMD(d) {
+  const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0"); return y + "-" + m + "-" + day;
+}
+function formatTimeHM(d) {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0"); return hh + ":" + mm;
+}
+
+/* ============================================================================
+ * SECTION 3: STORAGE LAYER (INDEXEDDB WITH MEMORY FALLBACK)
+ * ============================================================================ */
+const storage = {
+  db: null, memoryOnly: false, memSessions: {}, init: function () {
+    return new Promise(function (resolve) { if (!window.indexedDB) {
+        storage.enableMemoryFallback(); resolve(); return; }
+      let req; try { req = window.indexedDB.open(DB_NAME, DB_VERSION); } catch (err) {
+        storage.enableMemoryFallback(); resolve(); return; }
+      req.onupgradeneeded = function (e) { const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_SESSIONS)) {
+          db.createObjectStore(STORE_SESSIONS, { keyPath: "id" }); }
+      }; req.onsuccess = function (e) { storage.db = e.target.result; resolve(); };
+      req.onerror = function () { storage.enableMemoryFallback(); resolve(); }; });
+  }, enableMemoryFallback: function () {
+    storage.memoryOnly = true; document.getElementById("idbWarningBanner").classList.add("visible");
+    document.body.classList.add("has-idb-warning"); },
+  getAllSessions: function () { return new Promise(function (resolve) {
+      if (storage.memoryOnly || !storage.db) { resolve(Object.values(storage.memSessions)); return; }
+      try { const tx = storage.db.transaction(STORE_SESSIONS, "readonly");
+        const store = tx.objectStore(STORE_SESSIONS); const req = store.getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { storage.enableMemoryFallback(); resolve(Object.values(storage.memSessions)); };
+      } catch (err) { storage.enableMemoryFallback(); resolve(Object.values(storage.memSessions)); }
+    }); }, saveSession: function (sessionObj) { return new Promise(function (resolve) {
+      const copy = deepClone(sessionObj); storage.memSessions[copy.id] = copy;
+      if (storage.memoryOnly || !storage.db) { resolve(); return; } try {
+        const tx = storage.db.transaction(STORE_SESSIONS, "readwrite");
+        const store = tx.objectStore(STORE_SESSIONS); store.put(copy);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { storage.enableMemoryFallback(); resolve(); }; } catch (err) {
+        storage.enableMemoryFallback(); resolve(); } });
+  }, deleteSession: function (sessionId) {
+    return new Promise(function (resolve) { delete storage.memSessions[sessionId];
+      if (storage.memoryOnly || !storage.db) { resolve(); return; } try {
+        const tx = storage.db.transaction(STORE_SESSIONS, "readwrite");
+        const store = tx.objectStore(STORE_SESSIONS); store.delete(sessionId);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { storage.enableMemoryFallback(); resolve(); }; } catch (err) {
+        storage.enableMemoryFallback(); resolve(); } });
+  }
+};
+let autosaveTimer = null;
+function scheduleAutosave() {
+  if (!state.currentSession) return; const ind = document.getElementById("saveStatusIndicator");
+  ind.textContent = "Đang lưu..."; ind.classList.add("saving");
+  if (autosaveTimer) clearTimeout(autosaveTimer); autosaveTimer = setTimeout(function () {
+    autosaveTimer = null; if (!state.currentSession) return;
+    syncActiveIntervalToSession(); storage.saveSession(state.currentSession).then(function () {
+      ind.textContent = "Đã lưu"; ind.classList.remove("saving"); scheduleDraftSave(); }); }, 300);
+}
+// Optional draft folder (File System Access API, Chrome / Edge): the draft .zip and the session backup .json are
+// rewritten in the chosen folder after changes. The session stays open; nothing is finalised.
+let draftDirHandle = null; let draftSaveTimer = null;
+function scheduleDraftSave() {
+  if (!draftDirHandle) return; if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(function () { draftSaveTimer = null; saveDraftNow(false); }, 3000);
+}
+async function writeDraftFile(name, data) {
+  const fh = await draftDirHandle.getFileHandle(name, { create: true });
+  const w = await fh.createWritable(); await w.write(data); await w.close();
+}
+async function saveDraftNow(verbose) {
+  const session = state.currentSession; if (!draftDirHandle || !session) return;
+  try {
+    syncActiveIntervalToSession(); ensureSessionLabelsComplete(session);
+    const pkg = buildExportPackageAndValidate(session, true);
+    if (!pkg.valid) { throw new Error("Dữ liệu chưa hợp lệ: " + pkg.errors.slice(0, 3).join(" | ")); }
+    const code = ((session.annotatorCode || "").trim() || "labels").replace(/[^a-zA-Z0-9_-]/g, "_");
+    await writeDraftFile(code + "_draft.zip", createZipArchiveBytes(pkg.entries, new Date()));
+    await writeDraftFile(code + "_backup.json", JSON.stringify(session, null, 2));
+    const t = new Date(); const ind = document.getElementById("saveStatusIndicator");
+    ind.textContent = "Đã lưu + nháp " + formatTimeHM(t);
+    const btn = document.getElementById("btnPickDraftDir"); if (btn) btn.textContent = "Nháp: " + draftDirHandle.name;
+  } catch (err) {
+    document.getElementById("saveStatusIndicator").textContent = "Lưu nháp lỗi";
+    if (verbose) { openModal({ title: "Không lưu được bản nháp", bodyHtml: "<p>" + escapeHtml(String(err && err.message || err)) +
+      "</p><p>Hãy chọn lại thư mục, hoặc dùng nút \"Xuất kết quả (.zip)\" rồi chọn \"Xuất bản nháp\".</p>", hideCancel: true, confirmText: "Đóng" }); }
+  }
+}
+async function pickDraftDir() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    openModal({ title: "Trình duyệt không hỗ trợ", bodyHtml: "<p>Chức năng chọn thư mục chỉ có trong Chrome hoặc Edge bản mới. " +
+      "Bạn vẫn xuất bản nháp được bằng nút \"Xuất kết quả (.zip)\" rồi chọn \"Xuất bản nháp\"; file nằm trong thư mục Tải xuống.</p>",
+      hideCancel: true, confirmText: "Đóng" }); return; }
+  try { draftDirHandle = await window.showDirectoryPicker({ mode: "readwrite" }); } catch (err) { return; }
+  await saveDraftNow(true);
+}
+
+/* ============================================================================
+ * SECTION 4: TIME LOGGING & ACTIVITY TRACKING
+ * ============================================================================ */
+function startSessionInterval(session, initialImageId) {
+  const now = new Date(); const entry = { date: formatDateYMD(now), start: formatTimeHM(now),
+    end: formatTimeHM(now), firstImage: initialImageId || "",
+    lastImage: initialImageId || "", breakMinutes: 0, comment: "" };
+  session.timeLog = session.timeLog || []; session.timeLog.push(entry);
+  state.activeInterval = { index: session.timeLog.length - 1, lastActiveTs: Date.now(), breakMsAccum: 0
+  }; document.getElementById("sessionCommentInput").value = "";
+}
+function recordUserActivity(imageId) {
+  if (!state.currentSession || !state.activeInterval) return;
+  if (document.visibilityState !== "visible") return; const nowTs = Date.now();
+  const gap = nowTs - state.activeInterval.lastActiveTs;
+  if (gap > IDLE_THRESHOLD_MS) { state.activeInterval.breakMsAccum += gap; }
+  state.activeInterval.lastActiveTs = nowTs;
+  const logEntry = state.currentSession.timeLog[state.activeInterval.index]; if (logEntry) {
+    const nowDate = new Date(nowTs); logEntry.end = formatTimeHM(nowDate);
+    logEntry.breakMinutes = Math.round(state.activeInterval.breakMsAccum / 60000);
+    if (imageId) { if (!logEntry.firstImage) logEntry.firstImage = imageId; logEntry.lastImage = imageId; }
+    logEntry.comment = document.getElementById("sessionCommentInput").value.trim(); }
+}
+function syncActiveIntervalToSession() {
+  if (!state.currentSession || !state.activeInterval) return;
+  const logEntry = state.currentSession.timeLog[state.activeInterval.index]; if (!logEntry) return;
+  const nowTs = Date.now();
+  if (document.visibilityState === "visible" && (nowTs - state.activeInterval.lastActiveTs) <= IDLE_THRESHOLD_MS) {
+    logEntry.end = formatTimeHM(new Date(nowTs)); }
+  logEntry.breakMinutes = Math.round(state.activeInterval.breakMsAccum / 60000);
+  logEntry.comment = document.getElementById("sessionCommentInput").value.trim();
+}
+function closeActiveInterval() {
+  if (!state.currentSession || !state.activeInterval) return; syncActiveIntervalToSession();
+  state.activeInterval = null;
+}
+
+/* ============================================================================
+ * SECTION 5: MODAL DIALOG MANAGER (THREE-TIER STICKY)
+ * ============================================================================ */
+let activeModalHandlers = null;
+function openModal(options) {
+  const backdrop = document.getElementById("modalBackdrop");
+  const dialog = document.getElementById("modalDialog");
+  const titleEl = document.getElementById("modalTitle");
+  const bodyEl = document.getElementById("modalBody");
+  const btnCancel = document.getElementById("modalBtnCancel");
+  const btnConfirm = document.getElementById("modalBtnConfirm");
+  dialog.className = "modal-dialog" + (options.large ? " modal-lg" : "");
+  titleEl.textContent = options.title || "Thông báo"; bodyEl.innerHTML = options.bodyHtml || "";
+  btnCancel.textContent = options.cancelText || "Hủy bỏ";
+  btnCancel.style.display = options.hideCancel ? "none" : "inline-flex";
+  document.getElementById("modalFooter").style.gridTemplateColumns = options.hideCancel ? "1fr" : "1fr 1fr";
+  btnConfirm.textContent = options.confirmText || "Xác nhận";
+  btnConfirm.className = options.confirmClass || "btn-primary"; activeModalHandlers = {
+    onConfirm: options.onConfirm || function () { closeModal(); },
+    onCancel: options.onCancel || function () { closeModal(); } }; backdrop.classList.add("open");
+  if (typeof options.onOpen === "function") { options.onOpen(bodyEl); }
+}
+function closeModal() {
+  document.getElementById("modalBackdrop").classList.remove("open"); activeModalHandlers = null;
+}
+
+/* ============================================================================
+ * SECTION 6: IMAGE LOADING (GENERIC & EMBEDDED MODES)
+ * ============================================================================ */
+function stripExtension(filename) {
+  const base = filename.split(/[/\\]/).pop(); const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+function releaseCurrentImages() {
+  for (let i = 0; i < state.images.length; i++) {
+    if (state.images[i].isBlob && state.images[i].url) { URL.revokeObjectURL(state.images[i].url); } }
+  state.images = []; state.imageMap = {};
+}
+async function handleSelectedFiles(fileList) {
+  if (!fileList || fileList.length === 0) return; const imgFiles = [];
+  let classesFile = null; for (let i = 0; i < fileList.length; i++) {
+    const f = fileList[i]; const lower = f.name.toLowerCase();
+    if (lower === "classes.txt") { classesFile = f; } else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")) {
+      imgFiles.push(f); } } if (imgFiles.length === 0) {
+    openModal({ title: "Không tìm thấy ảnh hợp lệ",
+      bodyHtml: "<p>Vui lòng chọn thư mục hoặc tệp ảnh có định dạng <strong>.jpg, .jpeg, .png</strong>.</p>",
+      hideCancel: true, confirmText: "Đã hiểu" }); return;
+  } if (classesFile) { try { const txt = await classesFile.text();
+      const lines = txt.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      if (lines.length > 0) { state.classes = lines; } } catch (e) {
+      state.classes = DEFAULT_CLASSES.slice(); } } else { state.classes = DEFAULT_CLASSES.slice();
+  } imgFiles.sort(function (a, b) {
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }); });
+  releaseCurrentImages();
+  const loaded = []; for (let i = 0; i < imgFiles.length; i++) {
+    const f = imgFiles[i]; const id = stripExtension(f.name);
+    const url = URL.createObjectURL(f); const dims = await preloadImageDimensions(url);
+    const rec = { id: id, name: f.name, url: url,
+      isBlob: true, width: dims.width, height: dims.height, imgEl: dims.imgEl
+    }; loaded.push(rec); state.imageMap[id] = rec; }
+  state.images = loaded; state.imageSetKey = computeImageSetKey(loaded.map(function (x) { return x.id; }));
+  await showSessionScreen();
+}
+function preloadImageDimensions(url) {
+  return new Promise(function (resolve) { const img = new Image(); img.onload = function () { resolve({
+        width: img.naturalWidth || 640, height: img.naturalHeight || 512, imgEl: img });
+    }; img.onerror = function () { resolve({ width: 640, height: 512, imgEl: img }); };
+    img.src = url; });
+}
+async function initEmbeddedPackageIfPresent() {
+  if (!EMBEDDED_IMAGES || typeof EMBEDDED_IMAGES !== "object") return false; let imgDict = EMBEDDED_IMAGES;
+  if (EMBEDDED_IMAGES.images && typeof EMBEDDED_IMAGES.images === "object") {
+    imgDict = EMBEDDED_IMAGES.images;
+    if (Array.isArray(EMBEDDED_IMAGES.classes) && EMBEDDED_IMAGES.classes.length > 0) {
+      state.classes = EMBEDDED_IMAGES.classes.slice(); }
+    if (EMBEDDED_IMAGES.annotatorCode) { state.presetCode = EMBEDDED_IMAGES.annotatorCode; } }
+  if (Array.isArray(EMBEDDED_CLASSES) && EMBEDDED_CLASSES.length > 0) {
+    state.classes = EMBEDDED_CLASSES.slice(); }
+  const ids = Object.keys(imgDict).sort(function (a, b) {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }); });
+  if (ids.length === 0) return false; releaseCurrentImages();
+  for (let i = 0; i < ids.length; i++) { const id = ids[i];
+    const url = imgDict[id]; const dims = await preloadImageDimensions(url); const rec = { id: id,
+      name: id + ".jpg", url: url, isBlob: false, width: dims.width,
+      height: dims.height, imgEl: dims.imgEl }; state.images.push(rec);
+    state.imageMap[id] = rec; } state.imageSetKey = computeImageSetKey(ids);
+  document.getElementById("btnChangeImages").style.display = "none"; await showSessionScreen(); return true;
+}
+
+/* ============================================================================
+ * SECTION 7: SESSION MANAGEMENT SCREEN
+ * ============================================================================ */
+function switchScreen(screenId) {
+  const screens = document.querySelectorAll(".screen");
+  for (let i = 0; i < screens.length; i++) { screens[i].classList.remove("active"); }
+  document.getElementById(screenId).classList.add("active");
+}
+async function showSessionScreen() {
+  if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveTimer = null; }
+  if (state.currentSession) { closeActiveInterval();
+    await storage.saveSession(state.currentSession); state.currentSession = null;
+  } state.sessions = await storage.getAllSessions(); renderSessionList(); switchScreen("sessionScreen");
+}
+function createInitialLabelsMap() {
+  const map = {}; for (let i = 0; i < state.images.length; i++) { map[state.images[i].id] = { state: "todo",
+      boxes: [], note: "", deletedAiCount: 0 }; }
+  return map;
+}
+function ensureSessionLabelsComplete(session) {
+  if (!session.labels) session.labels = {}; for (let i = 0; i < state.images.length; i++) {
+    const id = state.images[i].id;
+    if (!session.labels[id]) { session.labels[id] = { state: "todo", boxes: [], note: "", deletedAiCount: 0 }; }
+    const lbl = session.labels[id];
+    if (!Array.isArray(lbl.boxes)) lbl.boxes = [];
+    for (let b = 0; b < lbl.boxes.length; b++) {
+      const box = lbl.boxes[b];
+      if (!box.src) box.src = "manual";
+      if (box.edited == null) box.edited = false;
+    }
+    if (typeof lbl.deletedAiCount !== "number" || isNaN(lbl.deletedAiCount) || lbl.deletedAiCount < 0) {
+      lbl.deletedAiCount = Array.isArray(lbl.deletedAiBoxes) ? lbl.deletedAiBoxes.length : 0;
+    }
+  }
+}
+function countDoneImages(session) {
+  let done = 0; for (let i = 0; i < state.images.length; i++) { const id = state.images[i].id;
+    if (session.labels && session.labels[id] && session.labels[id].state === "done") { done++; } }
+  return done;
+}
+function renderSessionList() {
+  const infoEl = document.getElementById("datasetInfoText");
+  infoEl.textContent = "Bộ ảnh hiện tại: " + state.images.length + " ảnh | Lớp nhãn (" + state.classes.length + "): " + state.classes.join(", ");
+  const matching = []; let otherCount = 0;
+  for (let i = 0; i < state.sessions.length; i++) { const s = state.sessions[i];
+    if (s.imageSetKey === state.imageSetKey) { matching.push(s); } else { otherCount++; } }
+  matching.sort(function (a, b) { return (b.createdAt || "").localeCompare(a.createdAt || ""); });
+  const container = document.getElementById("sessionListContainer"); container.innerHTML = "";
+  if (matching.length === 0) {
+    container.innerHTML = '<div class="dataset-summary"><span>Chưa có phiên làm việc nào cho bộ ảnh này. Nhấn <strong>"+ Tạo phiên mới"</strong> để bắt đầu.</span></div>';
+  } else { for (let i = 0; i < matching.length; i++) {
+      const s = matching[i]; const doneCount = countDoneImages(s);
+      const total = state.images.length; const isFinal = s.status === "final";
+      const item = document.createElement("div"); item.className = "session-item";
+      const meta = document.createElement("div"); meta.className = "session-meta";
+      const badgeHtml = isFinal ? '<span class="badge badge-final">Đã chốt (Chỉ đọc)</span>'
+        : '<span class="badge badge-open">Đang mở</span>'; meta.innerHTML =
+        "<h3>" + escapeHtml(s.name) + " " + badgeHtml + "</h3>" +
+        "<p>Mã người gán: <strong>" + escapeHtml(s.annotatorCode || "--") + "</strong> • Tiến độ: <strong>" + doneCount + " / " + total + "</strong> ảnh • Tạo lúc: " + escapeHtml(formatReadableDate(s.createdAt)) + "</p>";
+      const btns = document.createElement("div"); btns.className = "session-buttons";
+      const btnOpen = makeBtn("Mở phiên", "btn-primary btn-sm", function () { openWorkSession(s.id); });
+      const btnExport = makeBtn("Xuất kết quả", "btn-sm", function () { initiateExportSession(s); });
+      const btnBackup = makeBtn("Sao lưu phiên (.json)", "btn-sm", function () { downloadSessionBackup(s); });
+      const btnRename = makeBtn("Đổi tên", "btn-sm", function () { promptRenameSession(s); });
+      btns.appendChild(btnOpen); btns.appendChild(btnExport);
+      btns.appendChild(btnBackup); btns.appendChild(btnRename); if (!isFinal) {
+        const btnFinalize = makeBtn("Chốt phiên", "btn-success btn-sm", function () { promptFinalizeSession(s); });
+        const btnResetAll = makeBtn("Làm lại từ đầu", "btn-warning btn-sm", function () {
+          promptResetSession(s); }); btns.appendChild(btnFinalize); btns.appendChild(btnResetAll);
+      } else {
+        const btnReopen = makeBtn("Mở lại phiên", "btn-warning btn-sm", function () { promptReopenSession(s); });
+        btns.appendChild(btnReopen); }
+      const btnDelete = makeBtn("Xóa", "btn-danger btn-sm", function () { promptDeleteSession(s); });
+      btns.appendChild(btnDelete); item.appendChild(meta);
+      item.appendChild(btns); container.appendChild(item); } }
+  const otherNote = document.getElementById("otherSessionsNote"); if (otherCount > 0) {
+    otherNote.textContent = "Đang ẩn " + otherCount + " phiên làm việc thuộc bộ ảnh khác."; } else {
+    otherNote.textContent = ""; }
+}
+function makeBtn(text, cls, onClick) {
+  const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = text;
+  b.addEventListener("click", onClick); return b;
+}
+function escapeHtml(str) {
+  return String(str == null ? "" : str) .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;") .replace(/>/g, "&gt;") .replace(/"/g, "&quot;");
+}
+function formatReadableDate(iso) {
+  if (!iso) return "--"; const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso; return formatDateYMD(d) + " " + formatTimeHM(d);
+}
+function promptCreateSession() {
+  const defaultName = "Phiên làm việc " + (state.sessions.filter(function (s) { return s.imageSetKey === state.imageSetKey; }).length + 1);
+  openModal({ title: "Tạo Phiên Gán nhãn Mới", bodyHtml: '<div style="margin-bottom:10px;">' +
+        '<label style="display:block; margin-bottom:4px; font-weight:600;">Tên phiên làm việc:</label>' +
+        '<input type="text" id="inpSessionName" value="' + escapeHtml(defaultName) + '" placeholder="Ví dụ: Phiên sáng 27/10">' +
+        '<div id="errSessionName" class="field-error"></div>' + '</div>' + '<div>' +
+        '<label style="display:block; margin-bottom:4px; font-weight:600;">Mã người gán nhãn (ví dụ: A2):</label>' +
+        '<input type="text" id="inpAnnotatorCode" value="' + escapeHtml(state.presetCode) + '" placeholder="Ví dụ: A2">' +
+        '<div id="errAnnotatorCode" class="field-error"></div>' + '</div>',
+    confirmText: "Tạo & Mở phiên", onOpen: function () {
+      const nameInput = document.getElementById("inpSessionName");
+      const codeInput = document.getElementById("inpAnnotatorCode");
+      nameInput.addEventListener("input", function () { nameInput.classList.remove("input-error");
+        document.getElementById("errSessionName").textContent = ""; });
+      codeInput.addEventListener("input", function () { codeInput.classList.remove("input-error");
+        document.getElementById("errAnnotatorCode").textContent = ""; }); nameInput.focus(); },
+    onConfirm: async function () { const nameInput = document.getElementById("inpSessionName");
+      const codeInput = document.getElementById("inpAnnotatorCode");
+      const nameVal = nameInput.value.trim(); const codeVal = codeInput.value.trim();
+      let valid = true; if (!nameVal) { nameInput.classList.add("input-error");
+        document.getElementById("errSessionName").textContent = "Vui lòng nhập tên phiên làm việc.";
+        valid = false; } if (!codeVal) { codeInput.classList.add("input-error");
+        document.getElementById("errAnnotatorCode").textContent = "Vui lòng nhập mã người gán nhãn (ví dụ: A2).";
+        valid = false; } if (!valid) return;
+      const newSession = { id: "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        name: nameVal, annotatorCode: codeVal, createdAt: new Date().toISOString(), status: "open",
+        imageSetKey: state.imageSetKey, labels: createInitialLabelsMap(), timeLog: [] };
+      await storage.saveSession(newSession); state.sessions = await storage.getAllSessions();
+      closeModal(); openWorkSession(newSession.id); } });
+}
+function promptRenameSession(session) {
+  openModal({ title: "Đổi tên Phiên Làm việc", bodyHtml: '<div style="margin-bottom:10px;">' +
+        '<label style="display:block; margin-bottom:4px; font-weight:600;">Tên phiên mới:</label>' +
+        '<input type="text" id="inpRenameSession" value="' + escapeHtml(session.name) + '">' +
+        '<div id="errRenameSession" class="field-error"></div>' + '</div>' + '<div>' +
+        '<label style="display:block; margin-bottom:4px; font-weight:600;">Mã người gán nhãn:</label>' +
+        '<input type="text" id="inpRenameCode" value="' + escapeHtml(session.annotatorCode || "") + '">' +
+        '<div id="errRenameCode" class="field-error"></div>' + '</div>',
+    confirmText: "Lưu thay đổi", onConfirm: async function () {
+      const inpName = document.getElementById("inpRenameSession");
+      const inpCode = document.getElementById("inpRenameCode"); const newName = inpName.value.trim();
+      const newCode = inpCode.value.trim(); if (!newName) { inpName.classList.add("input-error");
+        document.getElementById("errRenameSession").textContent = "Tên phiên không được để trống.";
+        return; } if (!newCode) { inpCode.classList.add("input-error");
+        document.getElementById("errRenameCode").textContent = "Mã người gán không được để trống.";
+        return; } session.name = newName; session.annotatorCode = newCode;
+      await storage.saveSession(session); state.sessions = await storage.getAllSessions();
+      closeModal(); renderSessionList(); } });
+}
+function promptDeleteSession(session) {
+  openModal({ title: "Xác nhận xóa phiên làm việc", bodyHtml:
+      '<p style="margin-bottom:10px;">Bạn đang yêu cầu xóa vĩnh viễn phiên <strong>' + escapeHtml(session.name) + '</strong>. Hành động này không thể hoàn tác.</p>' +
+      '<label style="display:block; margin-bottom:4px; font-weight:600;">Nhập chữ <code>XOA</code> để xác nhận:</label>' +
+      '<input type="text" id="inpConfirmDelete" placeholder="Nhập XOA">' +
+      '<div id="errConfirmDelete" class="field-error"></div>', confirmText: "Xóa vĩnh viễn",
+    confirmClass: "btn-danger", onOpen: function () {
+      const inp = document.getElementById("inpConfirmDelete");
+      inp.addEventListener("input", function () { inp.classList.remove("input-error");
+        document.getElementById("errConfirmDelete").textContent = ""; }); inp.focus(); },
+    onConfirm: async function () { const inp = document.getElementById("inpConfirmDelete");
+      if (inp.value.trim() !== "XOA") { inp.classList.add("input-error");
+        document.getElementById("errConfirmDelete").textContent = "Vui lòng nhập chính xác chữ XOA (viết hoa).";
+        return; } await storage.deleteSession(session.id); state.sessions = await storage.getAllSessions();
+      closeModal(); renderSessionList(); } });
+}
+function promptFinalizeSession(session) {
+  const doneCount = countDoneImages(session); const total = state.images.length;
+  if (doneCount < total) { openModal({ title: "Chưa thể chốt phiên", bodyHtml:
+        '<p>Phiên làm việc hiện mới hoàn thành <strong>' + doneCount + ' / ' + total + '</strong> ảnh.</p>' +
+        '<p style="margin-top:8px; color:var(--text-muted);">Bạn chỉ có thể chốt phiên khi tất cả các ảnh trong bộ dữ liệu đã ở trạng thái "Đã xong".</p>',
+      hideCancel: true, confirmText: "Đã hiểu" }); return;
+  } openModal({ title: "Xác nhận chốt phiên làm việc", bodyHtml:
+      '<p>Sau khi chốt, phiên <strong>' + escapeHtml(session.name) + '</strong> sẽ chuyển sang trạng thái <strong>Chỉ đọc (Final)</strong> để đảm bảo an toàn dữ liệu khi xuất kết quả.</p>',
+    confirmText: "Chốt phiên ngay", confirmClass: "btn-success",
+    onConfirm: async function () { session.status = "final";
+      await storage.saveSession(session); state.sessions = await storage.getAllSessions();
+      closeModal(); renderSessionList(); } });
+}
+function promptReopenSession(session) {
+  openModal({ title: "Mở lại phiên đã chốt", bodyHtml:
+      '<p>Phiên <strong>' + escapeHtml(session.name) + '</strong> hiện đang khóa chỉnh sửa. Bạn có chắc chắn muốn mở khóa để chỉnh sửa tiếp không?</p>',
+    confirmText: "Mở lại phiên", confirmClass: "btn-warning",
+    onConfirm: async function () { session.status = "open";
+      await storage.saveSession(session); state.sessions = await storage.getAllSessions();
+      closeModal(); renderSessionList(); } });
+}
+function promptResetSession(session) {
+  openModal({ title: "Làm lại từ đầu phiên làm việc", bodyHtml:
+      '<p>Toàn bộ nhãn và ghi chú của tất cả ảnh trong phiên <strong>' + escapeHtml(session.name) + '</strong> sẽ bị xóa trắng về trạng thái "Chưa làm" (giữ nguyên tên phiên).</p>' +
+      '<p style="margin-top:8px; color:#fda4af;">Bạn có chắc chắn muốn xóa toàn bộ nhãn trong phiên này?</p>',
+    confirmText: "Xác nhận làm lại", confirmClass: "btn-danger",
+    onConfirm: async function () { session.labels = createInitialLabelsMap();
+      session.status = "open"; await storage.saveSession(session);
+      state.sessions = await storage.getAllSessions(); closeModal(); renderSessionList(); }
+  });
+}
+function downloadSessionBackup(session) {
+  if (state.currentSession && state.currentSession.id === session.id) { syncActiveIntervalToSession(); }
+  const jsonStr = JSON.stringify(session, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  const safeCode = (session.annotatorCode || "session").replace(/[^a-zA-Z0-9_-]/g, "_"); a.href = url;
+  a.download = safeCode + "_backup.json"; document.body.appendChild(a);
+  a.click(); document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+async function handleImportBackupFile(file) {
+  if (!file) return; try { const text = await file.text(); const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || !parsed.name || !parsed.labels) {
+      throw new Error("Cấu trúc tệp sao lưu không hợp lệ."); }
+    if (!parsed.id) { parsed.id = "sess_" + Date.now(); }
+    if (!parsed.imageSetKey) { parsed.imageSetKey = state.imageSetKey; }
+    await storage.saveSession(parsed); state.sessions = await storage.getAllSessions();
+    renderSessionList(); if (parsed.imageSetKey !== state.imageSetKey) {
+      openModal({ title: "Đã nạp bản sao lưu",
+        bodyHtml: "<p>Bản sao lưu đã được lưu vào bộ nhớ, nhưng thuộc bộ ảnh khác với bộ ảnh đang mở nên đang được ẩn.</p>",
+        hideCancel: true, confirmText: "Đã hiểu" }); }
+  } catch (err) { openModal({ title: "Lỗi nạp bản sao lưu",
+      bodyHtml: "<p>Không thể đọc tệp JSON: " + escapeHtml(err.message) + "</p>", hideCancel: true,
+      confirmText: "Đóng" }); }
+}
+
+/* ============================================================================
+ * SECTION 8: WORK SCREEN & CANVAS RENDERING
+ * ============================================================================ */
+function showToolNotice(msg) {
+  state.noticeMessage = msg || "";
+  const noticeEl = document.getElementById("canvasNotice");
+  if (noticeEl) {
+    noticeEl.textContent = state.noticeMessage;
+    noticeEl.classList.toggle("visible", Boolean(state.noticeMessage));
+  }
+  const hintEl = document.getElementById("drawHintText");
+  if (hintEl && state.noticeMessage) {
+    hintEl.textContent = state.noticeMessage;
+  }
+  if (state.noticeTimer) clearTimeout(state.noticeTimer);
+  if (state.noticeMessage) {
+    state.noticeTimer = setTimeout(function () {
+      state.noticeTimer = null;
+      state.noticeMessage = "";
+      if (noticeEl) noticeEl.classList.remove("visible");
+      updateStatusBarText();
+    }, 4000);
+  }
+}
+function clearToolNotice() {
+  if (state.noticeTimer) { clearTimeout(state.noticeTimer); state.noticeTimer = null; }
+  state.noticeMessage = "";
+  const noticeEl = document.getElementById("canvasNotice");
+  if (noticeEl) noticeEl.classList.remove("visible");
+}
+
+function openWorkSession(sessionId) {
+  const found = state.sessions.find(function (s) { return s.id === sessionId; }); if (!found) return;
+  state.currentSession = deepClone(found); ensureSessionLabelsComplete(state.currentSession);
+  state.historyByImage = {}; state.selectedBoxIndex = -1; state.drawStep = 0; state.quadPts = [];
+  clearToolNotice();
+  // Choose first 'todo' image or index 0
+  let firstIdx = 0; for (let i = 0; i < state.images.length; i++) { const id = state.images[i].id;
+    if (state.currentSession.labels[id].state === "todo") { firstIdx = i; break; } }
+  state.currentImageIndex = firstIdx;
+  const firstImageId = state.images[firstIdx] ? state.images[firstIdx].id : "";
+  startSessionInterval(state.currentSession, firstImageId); scheduleAutosave();
+  switchScreen("workScreen"); updateWorkHeaderUI(); renderClassButtons(); renderImageList();
+  loadCurrentImageIntoWorkspace(true);
+}
+function isSessionReadOnly() { return !state.currentSession || state.currentSession.status === "final"; }
+function updateWorkHeaderUI() {
+  if (!state.currentSession) return; document.getElementById("workSessionTitle").textContent =
+    "Phiên: " + state.currentSession.name + " (" + (state.currentSession.annotatorCode || "--") + ")";
+  const badge = document.getElementById("workSessionBadge");
+  if (state.currentSession.status === "final") { badge.className = "badge badge-final";
+    badge.textContent = "Đã chốt (Chỉ đọc)"; } else {
+    badge.className = "badge badge-open"; badge.textContent = "Đang mở"; }
+  const ro = isSessionReadOnly(); document.getElementById("btnMarkDone").disabled = ro;
+  document.getElementById("btnMarkNoFault").disabled = ro;
+  document.getElementById("btnResetImage").disabled = ro;
+  document.getElementById("imageNoteInput").disabled = ro;
+  const sqBtn = document.getElementById("btnSquareUp");
+  if (sqBtn) sqBtn.disabled = ro || state.selectedBoxIndex < 0;
+}
+function renderClassButtons() {
+  const container = document.getElementById("classButtonsContainer"); container.innerHTML = "";
+  for (let i = 0; i < state.classes.length; i++) { const clsName = state.classes[i];
+    const color = CLASS_COLORS[i % CLASS_COLORS.length]; const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "class-btn" + (state.activeClass === i ? " active" : "");
+    btn.innerHTML = '<span class="class-label-wrap">' +
+        '<span class="class-swatch" style="background-color:' + color + '"></span>' +
+        '<span>' + escapeHtml(i + ": " + clsName) + '</span>' + '</span>' +
+      '<span class="class-key">Phím ' + (i + 1) + '</span>';
+    btn.addEventListener("click", function () { selectClassIndex(i); }); container.appendChild(btn); }
+}
+function selectClassIndex(idx) {
+  if (idx < 0 || idx >= state.classes.length) return; state.activeClass = idx; renderClassButtons();
+  // In select/edit mode, if a box is currently selected and session is editable, update its class
+  if (!isSessionReadOnly() && state.activeTool === "select" && state.selectedBoxIndex >= 0) { const lbl = getCurrentImageLabel();
+    if (lbl && lbl.boxes[state.selectedBoxIndex]) {
+      const box = lbl.boxes[state.selectedBoxIndex];
+      if (box.cls !== idx) { pushUndoState();
+        box.cls = idx;
+        if (box.src === "ai") { box.edited = true; }
+        renderBoxList(); renderCanvas(); scheduleAutosave();
+      } } } else if (state.drawStep > 0) { renderCanvas(); }
+}
+function getCurrentImageRecord() { return state.images[state.currentImageIndex] || null; }
+function getCurrentImageLabel() {
+  const img = getCurrentImageRecord(); if (!img || !state.currentSession) return null;
+  return state.currentSession.labels[img.id];
+}
+function renderImageList() {
+  if (!state.currentSession) return; const listEl = document.getElementById("imageListEl");
+  listEl.innerHTML = "";
+  const doneCount = countDoneImages(state.currentSession);
+  document.getElementById("completionCounter").textContent =
+    doneCount + " / " + state.images.length + " hoàn thành";
+  for (let i = 0; i < state.images.length; i++) { const img = state.images[i];
+    const lbl = state.currentSession.labels[img.id] || { state: "todo", boxes: [], note: "" };
+    const hasNote = Boolean(lbl.note && lbl.note.trim().length > 0);
+    if (state.currentFilter === "todo" && lbl.state !== "todo") continue;
+    if (state.currentFilter === "done" && lbl.state !== "done") continue;
+    if (state.currentFilter === "note" && !hasNote) continue;
+    const row = document.createElement("div");
+    row.className = "image-row" + (i === state.currentImageIndex ? " active" : "");
+    const nameSpan = document.createElement("span"); nameSpan.className = "image-row-name";
+    nameSpan.textContent = img.id;
+    const badgesWrap = document.createElement("div"); badgesWrap.className = "image-row-badges";
+    if (lbl.state === "todo") { const b = document.createElement("span");
+      b.className = "badge badge-todo"; b.textContent = "chưa làm";
+      badgesWrap.appendChild(b); } else if (lbl.boxes.length > 0) {
+      const b = document.createElement("span"); b.className = "badge badge-done";
+      b.textContent = "xong (" + lbl.boxes.length + " box)"; badgesWrap.appendChild(b);
+    } else { const b = document.createElement("span");
+      b.className = "badge badge-clean"; b.textContent = "xong - không có lỗi"; badgesWrap.appendChild(b); }
+    if (hasNote) { const bn = document.createElement("span");
+      bn.className = "badge badge-note"; bn.textContent = "có ghi chú"; badgesWrap.appendChild(bn); }
+    row.appendChild(nameSpan); row.appendChild(badgesWrap);
+    row.addEventListener("click", (function (index) {
+      return function () { selectImageByIndex(index); }; })(i)); listEl.appendChild(row); }
+}
+function selectImageByIndex(index) {
+  if (index < 0 || index >= state.images.length) return; state.currentImageIndex = index;
+  state.selectedBoxIndex = -1; state.drawStep = 0; state.quadPts = []; clearToolNotice();
+  const img = getCurrentImageRecord(); if (img) recordUserActivity(img.id);
+  renderImageList(); loadCurrentImageIntoWorkspace(true);
+}
+function loadCurrentImageIntoWorkspace(fitOnLoad) {
+  const lbl = getCurrentImageLabel(); const noteInput = document.getElementById("imageNoteInput");
+  noteInput.value = lbl ? (lbl.note || "") : ""; updateUndoRedoButtons();
+  renderBoxList(); if (fitOnLoad) { fitImageToCanvas(); } else { renderCanvas(); }
+}
+function updateAiBanner() {
+  const banner = document.getElementById("aiSuggestBanner");
+  if (!banner) return;
+  const lbl = getCurrentImageLabel();
+  let hasAi = false;
+  if (lbl && lbl.boxes) {
+    for (let i = 0; i < lbl.boxes.length; i++) {
+      if (lbl.boxes[i].src === "ai") { hasAi = true; break; }
+    }
+  }
+  banner.classList.toggle("visible", hasAi);
+}
+function renderBoxList() {
+  const lbl = getCurrentImageLabel(); const container = document.getElementById("boxListContainer");
+  const countEl = document.getElementById("boxCountLabel"); container.innerHTML = "";
+  const ro = isSessionReadOnly();
+  const sqBtn = document.getElementById("btnSquareUp");
+  if (sqBtn) sqBtn.disabled = ro || state.selectedBoxIndex < 0 || !lbl || !lbl.boxes || !lbl.boxes[state.selectedBoxIndex];
+  updateAiBanner();
+  if (!lbl || !lbl.boxes || lbl.boxes.length === 0) { countEl.textContent = "0";
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:4px 0;">Chưa có box nào trên ảnh này.</div>';
+    return; } countEl.textContent = String(lbl.boxes.length);
+  for (let i = 0; i < lbl.boxes.length; i++) { const b = lbl.boxes[i];
+    const color = CLASS_COLORS[b.cls % CLASS_COLORS.length];
+    const clsName = state.classes[b.cls] || ("Lớp " + b.cls);
+    const aiTagHtml = (b.src === "ai")
+      ? (' <span class="box-tag-ai">' + (b.edited ? "AI·sửa" : "AI") + '</span>')
+      : "";
+    const item = document.createElement("div");
+    item.className = "box-item" + (i === state.selectedBoxIndex ? " selected" : ""); item.innerHTML =
+      '<span class="class-label-wrap">' +
+        '<span class="class-swatch" style="background-color:' + color + '"></span>' +
+        '<span>#' + (i + 1) + ' ' + escapeHtml(clsName) + aiTagHtml + '</span>' + '</span>';
+    if (!ro) { const delBtn = document.createElement("button");
+      delBtn.type = "button"; delBtn.className = "btn-danger btn-sm";
+      delBtn.style.minHeight = "22px"; delBtn.style.padding = "1px 6px";
+      delBtn.textContent = "Xóa"; delBtn.addEventListener("click", (function (boxIdx) {
+        return function (ev) { ev.stopPropagation(); deleteBoxAtIndex(boxIdx); }; })(i));
+      item.appendChild(delBtn); } item.addEventListener("click", (function (boxIdx) { return function () {
+        state.selectedBoxIndex = boxIdx; state.activeClass = lbl.boxes[boxIdx].cls;
+        if (state.activeTool !== "select") { setActiveTool("select", false); }
+        renderClassButtons(); renderBoxList(); renderCanvas(); };
+    })(i)); container.appendChild(item); }
+}
+function fitImageToCanvas() {
+  const viewport = document.getElementById("canvasViewport");
+  const canvas = document.getElementById("workCanvas"); const rect = viewport.getBoundingClientRect();
+  canvas.width = Math.max(100, Math.floor(rect.width));
+  canvas.height = Math.max(100, Math.floor(rect.height));
+  const img = getCurrentImageRecord(); if (!img) return;
+  const pad = 28; const availW = Math.max(50, canvas.width - pad * 2);
+  const availH = Math.max(50, canvas.height - pad * 2);
+  const scale = Math.min(availW / img.width, availH / img.height); state.zoom = scale;
+  state.panX = (canvas.width - img.width * scale) / 2;
+  state.panY = (canvas.height - img.height * scale) / 2; renderCanvas();
+}
+// Mouse position in canvas bitmap pixels. The bitmap size can differ from the CSS size of the canvas (layout change without a
+// window resize, fractional sizes), so the CSS offset is scaled by bitmap / CSS size.
+function canvasPointer(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const kx = rect.width > 0 ? canvas.width / rect.width : 1;
+  const ky = rect.height > 0 ? canvas.height / rect.height : 1;
+  return [ (e.clientX - rect.left) * kx, (e.clientY - rect.top) * ky ];
+}
+// Keep the bitmap equal to the viewport size when the layout changes (keeps zoom and pan).
+function syncCanvasSize() {
+  const viewport = document.getElementById("canvasViewport"); const canvas = document.getElementById("workCanvas");
+  if (!viewport || !canvas) return; const r = viewport.getBoundingClientRect();
+  const w = Math.max(100, Math.floor(r.width)); const h = Math.max(100, Math.floor(r.height));
+  if (w !== canvas.width || h !== canvas.height) { canvas.width = w; canvas.height = h; renderCanvas(); }
+}
+function screenToImageCoords(sx, sy) {
+  return [ (sx - state.panX) / state.zoom, (sy - state.panY) / state.zoom ];
+}
+function imageToScreenCoords(ix, iy) {
+  return [ ix * state.zoom + state.panX, iy * state.zoom + state.panY ];
+}
+function renderCanvas() {
+  const canvas = document.getElementById("workCanvas"); const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const img = getCurrentImageRecord(); if (!img) return;
+  // 1. Draw image with display-only CSS/canvas filters
+  ctx.save(); const filterParts = [
+    "brightness(" + state.brightness + "%)", "contrast(" + state.contrast + "%)"
+  ]; if (state.invert) filterParts.push("invert(100%)");
+  ctx.filter = filterParts.join(" "); ctx.translate(state.panX, state.panY);
+  ctx.scale(state.zoom, state.zoom);
+  if (img.imgEl && img.imgEl.complete) { ctx.drawImage(img.imgEl, 0, 0, img.width, img.height); }
+  ctx.restore();
+  // Draw subtle image border
+  const tl = imageToScreenCoords(0, 0); const br = imageToScreenCoords(img.width, img.height);
+  ctx.strokeStyle = "#475569"; ctx.lineWidth = 1;
+  ctx.strokeRect(tl[0], tl[1], br[0] - tl[0], br[1] - tl[1]);
+  // 2. Draw existing oriented boxes
+  const lbl = getCurrentImageLabel(); if (lbl && lbl.boxes && !state.boxesHidden) {
+    for (let i = 0; i < lbl.boxes.length; i++) { const b = lbl.boxes[i];
+      const isSelected = i === state.selectedBoxIndex;
+      const isAiUnedited = (b.src === "ai" && !b.edited);
+      drawOrientedBoxOnCanvas(ctx, b.pts, b.cls, isSelected, i + 1, false, isAiUnedited); } }
+  // 3. Draw live 3-click preview if drawing rectangle (N)
+  if (state.activeTool === "draw" && state.drawStep === 1 && state.drawP1) {
+    const p1s = imageToScreenCoords(state.drawP1[0], state.drawP1[1]);
+    const curS = imageToScreenCoords(state.mouseImgPos.x, state.mouseImgPos.y);
+    const color = CLASS_COLORS[state.activeClass % CLASS_COLORS.length]; ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath();
+    ctx.moveTo(p1s[0], p1s[1]); ctx.lineTo(curS[0], curS[1]); ctx.stroke(); ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(p1s[0], p1s[1], 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore(); } else if (state.activeTool === "draw" && state.drawStep === 2 && state.drawP1 && state.drawP2) {
+    const previewPts = computeOrientedBoxFrom3Points( state.drawP1,
+      state.drawP2, [state.mouseImgPos.x, state.mouseImgPos.y]
+    ); drawOrientedBoxOnCanvas(ctx, previewPts, state.activeClass, false, null, true, false);
+  }
+  // 4. Draw live 4-click quadrilateral preview (Q)
+  if (state.activeTool === "quad" && state.quadPts.length > 0) {
+    const color = CLASS_COLORS[state.activeClass % CLASS_COLORS.length];
+    const curImg = [state.mouseImgPos.x, state.mouseImgPos.y];
+    if (state.quadPts.length === 3) {
+      const previewQuad = [state.quadPts[0], state.quadPts[1], state.quadPts[2], curImg];
+      drawOrientedBoxOnCanvas(ctx, previewQuad, state.activeClass, false, null, true, false);
+    } else {
+      const sPts = state.quadPts.map(function (p) { return imageToScreenCoords(p[0], p[1]); });
+      const curS = imageToScreenCoords(curImg[0], curImg[1]);
+      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.moveTo(sPts[0][0], sPts[0][1]);
+      for (let i = 1; i < sPts.length; i++) { ctx.lineTo(sPts[i][0], sPts[i][1]); }
+      ctx.stroke();
+      ctx.setLineDash([5, 4]); ctx.beginPath();
+      ctx.moveTo(sPts[sPts.length - 1][0], sPts[sPts.length - 1][1]);
+      ctx.lineTo(curS[0], curS[1]);
+      if (sPts.length >= 2) { ctx.lineTo(sPts[0][0], sPts[0][1]); }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (let i = 0; i < sPts.length; i++) {
+        ctx.fillStyle = "#ffffff"; ctx.beginPath();
+        ctx.arc(sPts[i][0], sPts[i][1], 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  updateStatusBarText();
+}
+function drawOrientedBoxOnCanvas(ctx, pts, clsIdx, isSelected, boxNumber, isPreview, isAiUnedited) {
+  const color = CLASS_COLORS[clsIdx % CLASS_COLORS.length];
+  const sPts = pts.map(function (p) { return imageToScreenCoords(p[0], p[1]); }); ctx.save();
+  ctx.beginPath(); ctx.moveTo(sPts[0][0], sPts[0][1]);
+  for (let i = 1; i < 4; i++) { ctx.lineTo(sPts[i][0], sPts[i][1]); } ctx.closePath();
+  if (!state.outlineOnly) { ctx.fillStyle = isSelected ? hexToRgba(color, 0.28) : hexToRgba(color, 0.14); ctx.fill(); }
+  if (isPreview || isAiUnedited) { ctx.setLineDash([6, 4]); }
+  ctx.strokeStyle = (isSelected && !isAiUnedited) ? "#ffffff" : color;
+  ctx.lineWidth = isSelected ? 2.5 : 2; ctx.stroke(); ctx.setLineDash([]);
+  // Highlight primary edge P0-P1 so direction is obvious (keep dashed if unedited AI box)
+  ctx.beginPath(); ctx.moveTo(sPts[0][0], sPts[0][1]);
+  ctx.lineTo(sPts[1][0], sPts[1][1]);
+  if (isAiUnedited) { ctx.setLineDash([6, 4]); }
+  ctx.strokeStyle = color; ctx.lineWidth = 3.5; ctx.stroke(); ctx.setLineDash([]);
+  // Class tag
+  // Labels are small by default so they do not hide neighbouring modules: mode 0 = small number badge
+  // (full class name only on the selected box), 1 = no labels, 2 = full label on every box.
+  if (boxNumber != null && state.labelMode !== 1) {
+    const full = state.labelMode === 2 || isSelected;
+    const tag = "#" + boxNumber + (full ? " " + (state.classes[clsIdx] || clsIdx) : "");
+    ctx.font = (full ? "bold 11px" : "bold 9px") + " sans-serif"; const tw = ctx.measureText(tag).width + 6;
+    const th = full ? 16 : 12; ctx.globalAlpha = full ? 0.9 : 0.75;
+    ctx.fillStyle = color; ctx.fillRect(sPts[0][0], sPts[0][1] - th, tw, th); ctx.globalAlpha = 1;
+    ctx.fillStyle = "#090d16"; ctx.fillText(tag, sPts[0][0] + 3, sPts[0][1] - (full ? 4 : 3)); }
+  // Handles if selected (at least 12px screen size >= 10px requirement)
+  if (isSelected && !isSessionReadOnly()) {
+    const mid01 = [(sPts[0][0] + sPts[1][0]) / 2, (sPts[0][1] + sPts[1][1]) / 2];
+    const rotImg = getRotationHandlePos(pts, state.zoom);
+    const rotScreen = imageToScreenCoords(rotImg[0], rotImg[1]);
+    // Stem to rotation handle
+    ctx.beginPath(); ctx.moveTo(mid01[0], mid01[1]);
+    ctx.lineTo(rotScreen[0], rotScreen[1]); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
+    // Round rotation handle
+    ctx.beginPath(); ctx.arc(rotScreen[0], rotScreen[1], HANDLE_RADIUS_PX + 1, 0, Math.PI * 2);
+    ctx.fillStyle = "#38bdf8"; ctx.fill(); ctx.strokeStyle = "#090d16"; ctx.lineWidth = 2;
+    ctx.stroke();
+    // 4 Corner square handles (12x12 screen px)
+    for (let i = 0; i < 4; i++) { const cx = sPts[i][0]; const cy = sPts[i][1]; ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.rect(cx - HANDLE_RADIUS_PX, cy - HANDLE_RADIUS_PX, HANDLE_RADIUS_PX * 2, HANDLE_RADIUS_PX * 2);
+      ctx.fill(); ctx.stroke(); } }
+  ctx.restore();
+}
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace("#", ""); const r = parseInt(clean.substring(0, 2), 16) || 239;
+  const g = parseInt(clean.substring(2, 4), 16) || 68; const b = parseInt(clean.substring(4, 6), 16) || 68;
+  return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+}
+function updateStatusBarText() {
+  const hintEl = document.getElementById("drawHintText");
+  if (state.noticeMessage) {
+    hintEl.textContent = state.noticeMessage;
+  } else if (isSessionReadOnly()) {
+    hintEl.textContent = "Phiên đã chốt (Chỉ đọc): Không thể chỉnh sửa nhãn.";
+  } else if (state.activeTool === "draw" && state.drawStep === 1) {
+    hintEl.textContent = "Đang vẽ Box (N): Nhấp điểm 2 để xác định hướng và chiều dài cạnh đầu tiên (Esc để hủy).";
+  } else if (state.activeTool === "draw" && state.drawStep === 2) {
+    hintEl.textContent = "Đang vẽ Box (N): Di chuột chỉnh độ rộng vuông góc và nhấp điểm 3 để hoàn tất (Esc để hủy).";
+  } else if (state.activeTool === "quad") {
+    if (state.quadPts.length > 0) {
+      hintEl.textContent = "Đang vẽ Tứ giác (Q): Đã chấm " + state.quadPts.length + "/4 đỉnh — nhấp đỉnh tiếp theo theo thứ tự vòng quanh hình (Esc để hủy).";
+    } else {
+      hintEl.textContent = "Chế độ Tứ giác (Q): Nhấp 4 đỉnh theo thứ tự vòng quanh vùng lỗi (Esc để hủy); phím 1-4 chọn lớp cho box tiếp theo.";
+    }
+  } else if (state.activeTool === "select") {
+    hintEl.textContent = "Chế độ Chọn/Sửa (V): Kéo tự do từng đỉnh (giữ Shift khi kéo góc để giữ chữ nhật), nhấn R để ép thành chữ nhật, kéo tâm/xoay; phím 1-4 đổi lớp box đang chọn.";
+  } else {
+    hintEl.textContent = "Chế độ Vẽ (N): Nhấp 3 điểm vẽ chữ nhật (Q: tứ giác 4 đỉnh, V: kéo đỉnh/Shift giữ chữ nhật, R: ép thành chữ nhật); phím 1-4 chọn lớp.";
+  }
+  const coordEl = document.getElementById("cursorCoordText");
+  const rx = Math.round(state.mouseImgPos.x); const ry = Math.round(state.mouseImgPos.y);
+  const zPct = Math.round(state.zoom * 100);
+  coordEl.textContent = "Tọa độ: (" + rx + ", " + ry + ") px | Thu phóng: " + zPct + "%";
+}
+
+/* ============================================================================
+ * SECTION 9: INTERACTIVE CANVAS TOOLS & UNDO / REDO STACK
+ * ============================================================================ */
+function getHistoryForCurrentImage() {
+  const img = getCurrentImageRecord(); if (!img) return { undo: [], redo: [] };
+  if (!state.historyByImage[img.id]) { state.historyByImage[img.id] = { undo: [], redo: [] }; }
+  return state.historyByImage[img.id];
+}
+function pushUndoState() {
+  const lbl = getCurrentImageLabel(); if (!lbl) return;
+  const hist = getHistoryForCurrentImage(); hist.undo.push(deepClone(lbl));
+  if (hist.undo.length > 60) { hist.undo.shift(); } hist.redo = []; updateUndoRedoButtons();
+}
+function performUndo() {
+  if (isSessionReadOnly()) return; const img = getCurrentImageRecord();
+  const lbl = getCurrentImageLabel(); if (!img || !lbl) return;
+  const hist = getHistoryForCurrentImage(); if (hist.undo.length === 0) return;
+  hist.redo.push(deepClone(lbl)); const prev = hist.undo.pop();
+  state.currentSession.labels[img.id] = prev; state.selectedBoxIndex = -1;
+  state.drawStep = 0; state.quadPts = []; clearToolNotice();
+  document.getElementById("imageNoteInput").value = prev.note || "";
+  updateUndoRedoButtons(); renderImageList(); renderBoxList(); renderCanvas();
+  scheduleAutosave();
+}
+function performRedo() {
+  if (isSessionReadOnly()) return; const img = getCurrentImageRecord();
+  const lbl = getCurrentImageLabel(); if (!img || !lbl) return;
+  const hist = getHistoryForCurrentImage(); if (hist.redo.length === 0) return;
+  hist.undo.push(deepClone(lbl)); const next = hist.redo.pop();
+  state.currentSession.labels[img.id] = next; state.selectedBoxIndex = -1;
+  state.drawStep = 0; state.quadPts = []; clearToolNotice();
+  document.getElementById("imageNoteInput").value = next.note || "";
+  updateUndoRedoButtons(); renderImageList(); renderBoxList(); renderCanvas();
+  scheduleAutosave();
+}
+function updateUndoRedoButtons() {
+  const hist = getHistoryForCurrentImage(); const ro = isSessionReadOnly();
+  document.getElementById("btnUndo").disabled = ro || hist.undo.length === 0;
+  document.getElementById("btnRedo").disabled = ro || hist.redo.length === 0;
+}
+function recordDeletedAiIfNeeded(lbl, box) {
+  if (!lbl || !box) return;
+  if (box.src === "ai") {
+    lbl.deletedAiCount = (typeof lbl.deletedAiCount === "number" ? lbl.deletedAiCount : 0) + 1;
+  }
+}
+function deleteBoxAtIndex(boxIdx) {
+  if (isSessionReadOnly()) return; const lbl = getCurrentImageLabel();
+  if (!lbl || !lbl.boxes[boxIdx]) return; pushUndoState();
+  const removed = lbl.boxes.splice(boxIdx, 1)[0];
+  recordDeletedAiIfNeeded(lbl, removed);
+  if (state.selectedBoxIndex === boxIdx) { state.selectedBoxIndex = -1; } else if (state.selectedBoxIndex > boxIdx) {
+    state.selectedBoxIndex--; } renderImageList(); renderBoxList();
+  renderCanvas(); scheduleAutosave();
+}
+function squareUpSelectedBox() {
+  if (isSessionReadOnly() || state.selectedBoxIndex < 0) return;
+  const lbl = getCurrentImageLabel();
+  if (!lbl || !lbl.boxes[state.selectedBoxIndex]) return;
+  const box = lbl.boxes[state.selectedBoxIndex];
+  const newPts = squareUpQuadPoints(box.pts);
+  pushUndoState();
+  box.pts = newPts;
+  if (box.src === "ai") { box.edited = true; }
+  renderBoxList(); renderCanvas(); scheduleAutosave();
+}
+function setActiveTool(toolName, explicitDraw) {
+  clearToolNotice();
+  state.activeTool = toolName; state.forceNextDraw = Boolean(explicitDraw);
+  state.drawStep = 0; state.drawP1 = null; state.drawP2 = null; state.quadPts = [];
+  if (toolName !== "select") { state.selectedBoxIndex = -1; renderBoxList(); }
+  document.getElementById("btnToolDraw").classList.toggle("active", toolName === "draw");
+  const btnQuad = document.getElementById("btnToolQuad");
+  if (btnQuad) btnQuad.classList.toggle("active", toolName === "quad");
+  document.getElementById("btnToolSelect").classList.toggle("active", toolName === "select");
+  document.getElementById("canvasViewport").classList.toggle("mode-select", toolName === "select");
+  renderCanvas();
+}
+function hitTestHandles(screenX, screenY) {
+  const lbl = getCurrentImageLabel();
+  if (!lbl || state.selectedBoxIndex < 0 || !lbl.boxes[state.selectedBoxIndex]) return null;
+  const box = lbl.boxes[state.selectedBoxIndex]; const grabThreshold = 11; // >= 10 screen px requirement
+  // 1. Check rotation handle
+  const rotImg = getRotationHandlePos(box.pts, state.zoom);
+  const rotScr = imageToScreenCoords(rotImg[0], rotImg[1]);
+  if (Math.hypot(screenX - rotScr[0], screenY - rotScr[1]) <= grabThreshold) {
+    return { type: "rotate", boxIndex: state.selectedBoxIndex }; }
+  // 2. Check 4 corner handles
+  for (let i = 0; i < 4; i++) { const cScr = imageToScreenCoords(box.pts[i][0], box.pts[i][1]);
+    if (Math.hypot(screenX - cScr[0], screenY - cScr[1]) <= grabThreshold) {
+      return { type: "corner", boxIndex: state.selectedBoxIndex, cornerIndex: i }; } } return null;
+}
+function hitTestBoxBody(imgPt) {
+  const lbl = getCurrentImageLabel(); if (!lbl || !lbl.boxes) return -1;
+  // Prioritize currently selected box if inside it
+  if (state.selectedBoxIndex >= 0 && lbl.boxes[state.selectedBoxIndex]) {
+    if (pointInQuad(imgPt, lbl.boxes[state.selectedBoxIndex].pts)) { return state.selectedBoxIndex; }
+  } for (let i = lbl.boxes.length - 1; i >= 0; i--) {
+    if (pointInQuad(imgPt, lbl.boxes[i].pts)) { return i; } } return -1;
+}
+function setupCanvasInteractions() {
+  const canvas = document.getElementById("workCanvas");
+  const viewport = document.getElementById("canvasViewport");
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  canvas.addEventListener("dblclick", function () { fitImageToCanvas(); });
+  canvas.addEventListener("wheel", function (e) { e.preventDefault();
+    const pt0 = canvasPointer(e, canvas); const sx = pt0[0];
+    const sy = pt0[1]; const imgBefore = screenToImageCoords(sx, sy);
+    const factor = e.deltaY < 0 ? 1.14 : 1 / 1.14;
+    const newZoom = clamp(state.zoom * factor, 0.15, 18); state.zoom = newZoom;
+    state.panX = sx - imgBefore[0] * newZoom; state.panY = sy - imgBefore[1] * newZoom;
+    renderCanvas(); }, { passive: false });
+  canvas.addEventListener("mousedown", function (e) { const img = getCurrentImageRecord();
+    if (!img) return; recordUserActivity(img.id);
+    const pt1 = canvasPointer(e, canvas); const sx = pt1[0];
+    const sy = pt1[1]; const imgPt = screenToImageCoords(sx, sy);
+    state.mouseImgPos = { x: imgPt[0], y: imgPt[1] };
+    // Right mouse button or Space+Drag => Pan
+    if (e.button === 2 || e.button === 1 || (e.button === 0 && state.spacePressed)) {
+      state.dragAction = { type: "pan", startX: sx, startY: sy,
+        origPanX: state.panX, origPanY: state.panY }; viewport.classList.add("panning");
+      return; } if (e.button !== 0 || isSessionReadOnly()) return;
+    // In select/edit mode (when not mid-draw), check handles and existing boxes
+    if (state.drawStep === 0 && state.quadPts.length === 0 && state.activeTool === "select") {
+      clearToolNotice();
+      const handleHit = hitTestHandles(sx, sy);
+      if (handleHit) { const lbl = getCurrentImageLabel();
+        const origPts = deepClone(lbl.boxes[handleHit.boxIndex].pts); pushUndoState();
+        state.dragAction = { type: handleHit.type,
+          boxIndex: handleHit.boxIndex, cornerIndex: handleHit.cornerIndex,
+          origPts: origPts, wasRect: isRectangle(origPts), moved: false,
+          center: boxCenter(origPts),
+          startAngle: Math.atan2(imgPt[1] - boxCenter(origPts)[1], imgPt[0] - boxCenter(origPts)[0])
+        }; return; }
+      const bodyIdx = hitTestBoxBody(imgPt);
+      if (bodyIdx >= 0) {
+        const lbl = getCurrentImageLabel(); state.selectedBoxIndex = bodyIdx;
+        state.activeClass = lbl.boxes[bodyIdx].cls; renderClassButtons();
+        renderBoxList(); const origPts = deepClone(lbl.boxes[bodyIdx].pts);
+        pushUndoState(); state.dragAction = { type: "move", boxIndex: bodyIdx,
+          startImgPt: imgPt, origPts: origPts, moved: false };
+        renderCanvas(); return; }
+      state.selectedBoxIndex = -1; renderBoxList(); renderCanvas(); return;
+    }
+      // 3-click oriented rectangle drawing (N)
+      if (state.activeTool === "draw") {
+        clearToolNotice();
+        if (state.drawStep === 0) {
+          state.selectedBoxIndex = -1; state.drawP1 = [imgPt[0], imgPt[1]];
+          state.drawStep = 1; state.forceNextDraw = false; renderBoxList(); renderCanvas();
+        } else if (state.drawStep === 1) { if (dist2D(state.drawP1, imgPt) < 2) return;
+          state.drawP2 = [imgPt[0], imgPt[1]]; state.drawStep = 2;
+          renderCanvas(); } else if (state.drawStep === 2) {
+          const newPts = computeOrientedBoxFrom3Points(state.drawP1, state.drawP2, imgPt);
+          const lbl = getCurrentImageLabel(); if (lbl) { pushUndoState(); lbl.boxes.push({
+              cls: state.activeClass, pts: newPts, src: "manual", edited: false }); state.selectedBoxIndex = -1;
+            state.drawStep = 0; state.drawP1 = null; state.drawP2 = null; renderImageList();
+            renderBoxList(); renderCanvas(); scheduleAutosave(); }
+        }
+        return;
+      }
+      // 4-click general quadrilateral drawing (Q)
+      if (state.activeTool === "quad") {
+        clearToolNotice();
+        state.selectedBoxIndex = -1;
+        state.quadPts.push([imgPt[0], imgPt[1]]);
+        if (state.quadPts.length < 4) {
+          renderBoxList(); renderCanvas();
+        } else {
+          const candidate = state.quadPts.slice(0, 4);
+          state.quadPts = [];
+          if (!isSimpleQuad(candidate, 4)) {
+            showToolNotice("Tứ giác tự cắt hoặc diện tích nhỏ hơn 4 px², vui lòng chấm lại 4 đỉnh.");
+            renderCanvas();
+            return;
+          }
+          const lbl = getCurrentImageLabel();
+          if (lbl) {
+            pushUndoState();
+            lbl.boxes.push({ cls: state.activeClass, pts: candidate, src: "manual", edited: false });
+            state.selectedBoxIndex = -1;
+            renderImageList(); renderBoxList(); renderCanvas(); scheduleAutosave();
+          }
+        }
+        return;
+      }
+  }); window.addEventListener("mousemove", function (e) {
+    const canvasEl = document.getElementById("workCanvas");
+    const pt2 = canvasPointer(e, canvasEl); const sx = pt2[0];
+    const sy = pt2[1]; const imgPt = screenToImageCoords(sx, sy);
+    state.mouseImgPos = { x: imgPt[0], y: imgPt[1] }; if (state.dragAction) {
+      const act = state.dragAction; if (act.type === "pan") {
+        state.panX = act.origPanX + (sx - act.startX); state.panY = act.origPanY + (sy - act.startY);
+        renderCanvas(); return; }
+      const lbl = getCurrentImageLabel();
+      if (!lbl || !lbl.boxes[act.boxIndex]) return;
+      const box = lbl.boxes[act.boxIndex];
+      if (act.type === "move") {
+        const dx = imgPt[0] - act.startImgPt[0]; const dy = imgPt[1] - act.startImgPt[1];
+        if (Math.hypot(dx, dy) > 0.5) {
+          act.moved = true;
+          box.pts = act.origPts.map(function (p) { return [p[0] + dx, p[1] + dy]; });
+          if (box.src === "ai") { box.edited = true; }
+        }
+        renderCanvas();
+      } else if (act.type === "corner") {
+        if (e.shiftKey && act.wasRect) {
+          box.pts = resizeBoxCorner(act.origPts, act.cornerIndex, imgPt);
+          act.moved = true;
+          if (box.src === "ai") { box.edited = true; }
+        } else {
+          act.wasRect = false;
+          const curPts = box.pts;
+          const candidate = deepClone(curPts);
+          candidate[act.cornerIndex] = [imgPt[0], imgPt[1]];
+          if (isSimpleQuad(candidate, 4) &&
+              Math.sign(polygonSignedArea(candidate)) === Math.sign(polygonSignedArea(curPts))) {
+            box.pts = candidate;
+            act.moved = true;
+            if (box.src === "ai") { box.edited = true; }
+          }
+        }
+        renderCanvas();
+      } else if (act.type === "rotate") {
+        const curAngle = Math.atan2(imgPt[1] - act.center[1], imgPt[0] - act.center[0]);
+        if (Math.abs(curAngle - act.startAngle) > 1e-4) {
+          act.moved = true;
+          box.pts = rotateBoxPoints(act.origPts, curAngle - act.startAngle);
+          if (box.src === "ai") { box.edited = true; }
+        }
+        renderCanvas();
+      }
+      return;
+    }
+    if (document.getElementById("workScreen").classList.contains("active")) {
+      if (state.drawStep > 0 || state.quadPts.length > 0) { renderCanvas(); } else { updateStatusBarText(); } }
+  }); window.addEventListener("mouseup", function () {
+    if (!state.dragAction) return; const act = state.dragAction;
+    state.dragAction = null; viewport.classList.remove("panning");
+    if ((act.type === "move" || act.type === "corner" || act.type === "rotate") && !act.moved) {
+      // Selected without moving: discard the redundant undo entry
+      const hist = getHistoryForCurrentImage(); hist.undo.pop();
+      updateUndoRedoButtons(); } else if (act.type !== "pan") {
+      renderBoxList(); renderCanvas(); scheduleAutosave();
+    }
+  });
+}
+
+/* ============================================================================
+ * SECTION 10: IMAGE COMPLETION ACTIONS & KEYBOARD SHORTCUTS
+ * ============================================================================ */
+function jumpToNextTodoOrNext() {
+  if (!state.currentSession) return; const total = state.images.length;
+  for (let offset = 1; offset <= total; offset++) {
+    const idx = (state.currentImageIndex + offset) % total; const id = state.images[idx].id;
+    if (state.currentSession.labels[id].state === "todo") { selectImageByIndex(idx); return; } }
+  renderImageList(); renderCanvas();
+}
+function handleMarkDoneClick() {
+  if (isSessionReadOnly()) return; const lbl = getCurrentImageLabel();
+  if (!lbl) return; if (lbl.boxes.length === 0) { openModal({ title: "Xác nhận ảnh không có lỗi",
+      bodyHtml: "<p>Ảnh không có box, xác nhận không có lỗi?</p>",
+      confirmText: "Xác nhận không có lỗi", confirmClass: "btn-success",
+      onConfirm: function () { closeModal(); pushUndoState(); lbl.state = "done";
+        scheduleAutosave(); jumpToNextTodoOrNext(); } });
+    return; } pushUndoState(); lbl.state = "done";
+  scheduleAutosave(); jumpToNextTodoOrNext();
+}
+function handleMarkNoFaultClick() {
+  if (isSessionReadOnly()) return; const lbl = getCurrentImageLabel(); if (!lbl) return; pushUndoState();
+  for (let i = 0; i < lbl.boxes.length; i++) { recordDeletedAiIfNeeded(lbl, lbl.boxes[i]); }
+  lbl.boxes = []; lbl.state = "done"; state.selectedBoxIndex = -1; state.drawStep = 0;
+  scheduleAutosave(); jumpToNextTodoOrNext();
+}
+function handleResetCurrentImage() {
+  if (isSessionReadOnly()) return; const lbl = getCurrentImageLabel(); if (!lbl) return; pushUndoState();
+  for (let i = 0; i < lbl.boxes.length; i++) { recordDeletedAiIfNeeded(lbl, lbl.boxes[i]); }
+  lbl.boxes = []; lbl.state = "todo"; state.selectedBoxIndex = -1; state.drawStep = 0;
+  renderImageList(); renderBoxList(); renderCanvas(); scheduleAutosave();
+}
+function setupKeyboardShortcuts() {
+  window.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && !isInputFocused(e.target)) { state.spacePressed = true; }
+    // If modal is open, Esc closes modal
+    if (document.getElementById("modalBackdrop").classList.contains("open")) {
+      if (e.key === "Escape") { closeModal(); } return;
+    } if (!document.getElementById("workScreen").classList.contains("active")) return;
+    if (isInputFocused(e.target)) return;
+    const img = getCurrentImageRecord(); if (img) recordUserActivity(img.id);
+    // Undo / Redo
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault();
+      if (e.shiftKey) performRedo(); else performUndo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault();
+      performRedo(); return; } if (e.key === "Escape") {
+      clearToolNotice();
+      if (state.drawStep > 0 || state.quadPts.length > 0) {
+        state.drawStep = 0; state.drawP1 = null; state.drawP2 = null; state.quadPts = [];
+        renderCanvas(); } else if (state.selectedBoxIndex >= 0) {
+        state.selectedBoxIndex = -1; renderBoxList(); renderCanvas(); }
+      return; }
+    // Previous / Next image: PageUp/PageDown or A/D
+    if (e.key === "PageUp" || e.key.toLowerCase() === "a") { e.preventDefault();
+      if (state.currentImageIndex > 0) { selectImageByIndex(state.currentImageIndex - 1); } return;
+    } if (e.key === "PageDown" || e.key.toLowerCase() === "d") {
+      e.preventDefault(); if (state.currentImageIndex < state.images.length - 1) {
+        selectImageByIndex(state.currentImageIndex + 1); } return; }
+    // Class keys 1-4
+    if (e.key >= "1" && e.key <= "9") { const idx = parseInt(e.key, 10) - 1;
+      if (idx < state.classes.length) { e.preventDefault(); selectClassIndex(idx); } return;
+    } if (e.key.toLowerCase() === "n") { e.preventDefault(); setActiveTool("draw", true);
+      return; } if (e.key.toLowerCase() === "q") { e.preventDefault(); setActiveTool("quad", true);
+      return; } if (e.key.toLowerCase() === "v") { e.preventDefault();
+      setActiveTool("select", false); return; } if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey) {
+      if (state.activeTool === "select" && state.selectedBoxIndex >= 0) {
+        e.preventDefault(); squareUpSelectedBox();
+      }
+      return; } if (e.key.toLowerCase() === "f") {
+      e.preventDefault(); fitImageToCanvas(); return; }
+    if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "l") { e.preventDefault(); cycleLabelMode(); return; }
+    if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "o") { e.preventDefault(); toggleOutlineOnly(); return; }
+    if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "h") { e.preventDefault();
+      if (!state.boxesHidden) { state.boxesHidden = true; renderCanvas(); } return; }
+    if (e.key === "Enter") { e.preventDefault(); handleMarkDoneClick(); return;
+    } if (e.key.toLowerCase() === "e") { e.preventDefault(); handleMarkNoFaultClick();
+      return; } if (e.key === "Delete" || e.key === "Backspace") {
+      if (state.selectedBoxIndex >= 0) { e.preventDefault(); deleteBoxAtIndex(state.selectedBoxIndex); }
+    } }); window.addEventListener("keyup", function (e) {
+    if (e.code === "Space") { state.spacePressed = false; }
+    if (e.key.toLowerCase() === "h" && state.boxesHidden) { state.boxesHidden = false; renderCanvas(); } });
+  window.addEventListener("blur", function () {
+    if (state.boxesHidden) { state.boxesHidden = false; renderCanvas(); } });
+}
+function cycleLabelMode() {
+  state.labelMode = (state.labelMode + 1) % 3;
+  const names = ["Nhãn: nhỏ (L)", "Nhãn: ẩn (L)", "Nhãn: đầy đủ (L)"];
+  const btn = document.getElementById("btnLabelMode"); if (btn) btn.textContent = names[state.labelMode];
+  renderCanvas();
+}
+function toggleOutlineOnly() {
+  state.outlineOnly = !state.outlineOnly;
+  const btn = document.getElementById("btnOutlineOnly");
+  if (btn) { btn.classList.toggle("active", state.outlineOnly); btn.textContent = state.outlineOnly ? "Chỉ viền: bật (O)" : "Chỉ viền (O)"; }
+  renderCanvas();
+}
+function isInputFocused(el) {
+  if (!el) return false; const tag = (el.tagName || "").toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+}
+
+/* ============================================================================
+ * SECTION 11: PURE JS ZIP WRITER (STORE METHOD, CRC-32, UTF-8) & VALIDATOR
+ * ============================================================================ */
+const CRC32_TABLE = (function () {
+  const table = new Uint32Array(256); for (let i = 0; i < 256; i++) {
+    let c = i; for (let k = 0; k < 8; k++) { c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1); }
+    table[i] = c >>> 0; } return table;
+})();
+function crc32Bytes(uint8Arr) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < uint8Arr.length; i++) { crc = CRC32_TABLE[(crc ^ uint8Arr[i]) & 0xff] ^ (crc >>> 8); }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function dateToDosDateTime(dateObj) {
+  const year = Math.max(1980, dateObj.getFullYear()); const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate(); const hours = dateObj.getHours();
+  const minutes = dateObj.getMinutes(); const seconds = Math.floor(dateObj.getSeconds() / 2);
+  const dosDate = ((year - 1980) << 9) | (month << 5) | day;
+  const dosTime = (hours << 11) | (minutes << 5) | seconds;
+  return { dosDate: dosDate & 0xffff, dosTime: dosTime & 0xffff };
+}
+// Build a valid ZIP archive Uint8Array from [{ path: string, content: string }]
+function createZipArchiveBytes(entries, nowDate) {
+  const encoder = new TextEncoder(); const dt = dateToDosDateTime(nowDate || new Date());
+  const localChunks = []; const centralChunks = [];
+  let offset = 0; for (let i = 0; i < entries.length; i++) {
+    const nameBytes = encoder.encode(entries[i].path);
+    const dataBytes = typeof entries[i].content === "string" ? encoder.encode(entries[i].content)
+      : entries[i].content; const crc = crc32Bytes(dataBytes); const size = dataBytes.length;
+    // Local File Header (30 + nameBytes.length)
+    const lfh = new Uint8Array(30 + nameBytes.length); const lfhView = new DataView(lfh.buffer);
+    lfhView.setUint32(0, 0x04034b50, true); // signature
+    lfhView.setUint16(4, 20, true);         // version needed (2.0)
+    lfhView.setUint16(6, 0x0800, true);     // UTF-8 flag bit 11
+    lfhView.setUint16(8, 0, true);          // STORE method (0)
+    lfhView.setUint16(10, dt.dosTime, true); lfhView.setUint16(12, dt.dosDate, true);
+    lfhView.setUint32(14, crc, true); lfhView.setUint32(18, size, true);      // compressed size
+    lfhView.setUint32(22, size, true);      // uncompressed size
+    lfhView.setUint16(26, nameBytes.length, true);
+    lfhView.setUint16(28, 0, true);
+    lfh.set(nameBytes, 30);
+    localChunks.push(lfh, dataBytes);
+    // Central Directory File Header (46 + nameBytes.length)
+    const cdfh = new Uint8Array(46 + nameBytes.length); const cdView = new DataView(cdfh.buffer);
+    cdView.setUint32(0, 0x02014b50, true);  // signature
+    cdView.setUint16(4, 20, true);          // version made by
+    cdView.setUint16(6, 20, true);          // version needed
+    cdView.setUint16(8, 0x0800, true);      // UTF-8 flag
+    cdView.setUint16(10, 0, true);
+    cdView.setUint16(12, dt.dosTime, true);
+    cdView.setUint16(14, dt.dosDate, true); cdView.setUint32(16, crc, true);
+    cdView.setUint32(20, size, true); cdView.setUint32(24, size, true);
+    cdView.setUint16(28, nameBytes.length, true); cdView.setUint16(30, 0, true);
+    cdView.setUint16(32, 0, true);          // comment length
+    cdView.setUint16(34, 0, true);          // disk number
+    cdView.setUint16(36, 0, true);          // internal attrs
+    cdView.setUint32(38, 0, true);          // external attrs
+    cdView.setUint32(42, offset, true);
+    cdfh.set(nameBytes, 46);
+    centralChunks.push(cdfh); offset += lfh.length + size; } let cdSize = 0;
+  for (let i = 0; i < centralChunks.length; i++) { cdSize += centralChunks[i].length; }
+  // End of Central Directory Record (22 bytes)
+  const eocd = new Uint8Array(22); const eocdView = new DataView(eocd.buffer);
+  eocdView.setUint32(0, 0x06054b50, true); eocdView.setUint16(4, 0, true);
+  eocdView.setUint16(6, 0, true); eocdView.setUint16(8, entries.length, true);
+  eocdView.setUint16(10, entries.length, true); eocdView.setUint32(12, cdSize, true);
+  eocdView.setUint32(16, offset, true); eocdView.setUint16(20, 0, true);
+  const totalSize = offset + cdSize + 22; const out = new Uint8Array(totalSize); let pos = 0;
+  for (let i = 0; i < localChunks.length; i++) { out.set(localChunks[i], pos); pos += localChunks[i].length; }
+  for (let i = 0; i < centralChunks.length; i++) { out.set(centralChunks[i], pos);
+    pos += centralChunks[i].length; } out.set(eocd, pos); return out;
+}
+function buildExportPackageAndValidate(session, isDraft) {
+  if (state.currentSession && state.currentSession.id === session.id) { syncActiveIntervalToSession(); }
+  ensureSessionLabelsComplete(session);
+  const entries = []; const noteRows = ["image,note"];
+  const assistRows = ["image,box_index,src,status"];
+  const errors = []; let labelFileCount = 0;
+  let totalBoxes = 0; const maxClassId = Math.max(3, state.classes.length - 1);
+  for (let i = 0; i < state.images.length; i++) { const img = state.images[i];
+    const lbl = session.labels[img.id] || { state: "todo", boxes: [], note: "", deletedAiCount: 0 };
+    const isTodo = lbl.state === "todo";
+    const lines = []; if (!isTodo || !isDraft) { for (let b = 0; b < lbl.boxes.length; b++) {
+        const box = lbl.boxes[b];
+        const line = formatBoxLine(box, img.width, img.height); lines.push(line); totalBoxes++;
+        const isAi = (box.src === "ai");
+        const boxSrc = isAi ? "ai" : "manual";
+        const boxStatus = isAi ? (box.edited ? "ai_edited" : "ai_kept") : "manual";
+        assistRows.push(csvEscape(img.id) + "," + b + "," + boxSrc + "," + boxStatus);
+      }
+    }
+    const delAiCount = typeof lbl.deletedAiCount === "number" ? lbl.deletedAiCount : 0;
+    for (let d = 0; d < delAiCount; d++) {
+      assistRows.push(csvEscape(img.id) + ",,ai,ai_deleted");
+    }
+    const txtContent = lines.length > 0 ? (lines.join("\n") + "\n") : ""; entries.push({
+      path: "labels/" + img.id + ".txt", content: txtContent }); labelFileCount++;
+    // Validate generated lines
+    if (txtContent.length > 0) { const checkLines = txtContent.trimEnd().split("\n");
+      for (let l = 0; l < checkLines.length; l++) { const tokens = checkLines[l].split(" ");
+        if (tokens.length !== 9) { errors.push(img.id + ".txt dòng " + (l + 1) + ": không đủ 9 số."); continue; }
+        const clsNum = Number(tokens[0]);
+        if (!Number.isInteger(clsNum) || clsNum < 0 || clsNum > maxClassId) {
+          errors.push(img.id + ".txt dòng " + (l + 1) + ": class_id " + tokens[0] + " ngoài phạm vi.");
+        } for (let k = 1; k < 9; k++) { const v = Number(tokens[k]);
+          if (isNaN(v) || v < 0 || v > 1 || !/^\d\.\d{6}$/.test(tokens[k])) {
+            errors.push(img.id + ".txt dòng " + (l + 1) + ": tọa độ '" + tokens[k] + "' không hợp lệ."); } }
+      } }
+    const cleanNote = (lbl.note || "").trim();
+    if (cleanNote.length > 0) { noteRows.push(csvEscape(img.id) + "," + csvEscape(cleanNote)); }
+    if (isDraft && isTodo) { noteRows.push(csvEscape(img.id) + ",CHUA LAM"); } }
+  if (labelFileCount !== state.images.length) {
+    errors.push("Số tệp nhãn (" + labelFileCount + ") không khớp số lượng ảnh (" + state.images.length + ").");
+  } entries.push({ path: "notes.csv", content: noteRows.join("\n") + "\n"
+  });
+  const timeRows = ["date,start_time,end_time,first_image,last_image,break_minutes,comment"];
+  const logs = session.timeLog || []; for (let i = 0; i < logs.length; i++) {
+    const t = logs[i]; timeRows.push([ csvEscape(t.date || ""), csvEscape(t.start || ""),
+      csvEscape(t.end || ""), csvEscape(t.firstImage || ""),
+      csvEscape(t.lastImage || ""), csvEscape(t.breakMinutes != null ? t.breakMinutes : 0),
+      csvEscape(t.comment || "") ].join(",")); } entries.push({
+    path: "time_log.csv", content: timeRows.join("\n") + "\n" });
+  entries.push({
+    path: "assist_log.csv", content: assistRows.join("\n") + "\n" });
+  return {
+    entries: entries, valid: errors.length === 0, errors: errors, labelFileCount: labelFileCount,
+    totalBoxes: totalBoxes };
+}
+function initiateExportSession(session) {
+  ensureSessionLabelsComplete(session); const todoIds = [];
+  for (let i = 0; i < state.images.length; i++) { const id = state.images[i].id;
+    if (session.labels[id].state === "todo") { todoIds.push(id); } }
+  // If session is NOT final and has todo images, warn and offer choice
+  if (session.status !== "final" && todoIds.length > 0) { openModal({
+      title: "Cảnh báo: Còn " + todoIds.length + " ảnh chưa hoàn thành", large: true,
+      bodyHtml: "<p>Các ảnh sau đây vẫn đang ở trạng thái <strong>Chưa làm</strong>:</p>" +
+        '<div class="todo-warning-list">' + todoIds.map(escapeHtml).join(", ") + "</div>" +
+        "<p>Bạn muốn quay lại làm tiếp hay xuất bản nháp?</p>", cancelText: "Quay lại làm tiếp",
+      confirmText: "Xuất bản nháp (ảnh chưa làm sẽ ghi nhãn rỗng và được liệt kê trong notes.csv)",
+      confirmClass: "btn-warning",
+      onConfirm: function () { closeModal(); runValidationAndDownloadZip(session, true); } }); return; }
+  runValidationAndDownloadZip(session, false);
+}
+function runValidationAndDownloadZip(session, isDraft) {
+  const pkg = buildExportPackageAndValidate(session, isDraft);
+  const code = (session.annotatorCode || "").trim();
+  const zipFilename = (code ? code : "labels_export") + ".zip"; if (!pkg.valid) {
+    openModal({ title: "Kiểm tra dữ liệu thất bại", large: true, bodyHtml:
+        '<p class="validation-err">Phát hiện lỗi định dạng khi kiểm tra trước khi tải:</p>' +
+        '<div class="todo-warning-list">' + pkg.errors.map(escapeHtml).join("<br>") + '</div>',
+      hideCancel: true, confirmText: "Đóng" }); return;
+  }
+  const zipBytes = createZipArchiveBytes(pkg.entries, new Date());
+  const blob = new Blob([zipBytes], { type: "application/zip" });
+  const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href = url; a.download = zipFilename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  openModal({ title: "Kiểm tra & Xuất kết quả thành công", bodyHtml:
+      '<p>Tệp <strong>' + escapeHtml(zipFilename) + '</strong> đã được tạo và tải xuống.</p>' +
+      '<div class="validation-box validation-ok">' + '✔ Kiểm tra hợp lệ: <strong>ĐẠT 100%</strong><br>' +
+        '• Số tệp nhãn: ' + pkg.labelFileCount + ' / ' + state.images.length + ' ảnh<br>' +
+        '• Tổng số box xuất ra: ' + pkg.totalBoxes + ' (9 trường/dòng, class 0..' + Math.max(3, state.classes.length - 1) + ', tọa độ chuẩn hóa [0,1] 6 chữ số thập phân)<br>' +
+        '• Đã đính kèm: <code>notes.csv</code>, <code>time_log.csv</code> và <code>assist_log.csv</code>' + '</div>',
+    hideCancel: true, confirmText: "Hoàn tất" });
+}
+
+/* ============================================================================
+ * SECTION 12: EVENT WIRING & INITIALIZATION
+ * ============================================================================ */
+function wireAllEvents() {
+  // Modal buttons
+  document.getElementById("modalBtnCancel").addEventListener("click", function () {
+    if (activeModalHandlers && activeModalHandlers.onCancel) { activeModalHandlers.onCancel(); } else {
+      closeModal(); } }); document.getElementById("modalBtnConfirm").addEventListener("click", function () {
+    if (activeModalHandlers && activeModalHandlers.onConfirm) { activeModalHandlers.onConfirm(); } else {
+      closeModal(); } });
+  // Start screen buttons
+  document.getElementById("btnPickFolder").addEventListener("click", function () {
+    document.getElementById("inputFolder").click(); });
+  document.getElementById("btnPickFiles").addEventListener("click", function () {
+    document.getElementById("inputFiles").click(); });
+  document.getElementById("inputFolder").addEventListener("change", function (e) {
+    handleSelectedFiles(e.target.files); e.target.value = "";
+  }); document.getElementById("inputFiles").addEventListener("change", function (e) {
+    handleSelectedFiles(e.target.files); e.target.value = ""; });
+  // Session screen buttons
+  document.getElementById("btnChangeImages").addEventListener("click", function () {
+    switchScreen("startScreen"); });
+  document.getElementById("btnOpenCreateSession").addEventListener("click", function () {
+    promptCreateSession(); });
+  document.getElementById("btnImportBackup").addEventListener("click", function () {
+    document.getElementById("inputBackupFile").click(); });
+  document.getElementById("inputBackupFile").addEventListener("change", function (e) {
+    if (e.target.files && e.target.files[0]) { handleImportBackupFile(e.target.files[0]); }
+    e.target.value = ""; });
+  // Work screen topbar
+  document.getElementById("btnBackToSessions").addEventListener("click", function () { showSessionScreen(); });
+  document.getElementById("sessionCommentInput").addEventListener("input", function () {
+    const img = getCurrentImageRecord(); recordUserActivity(img ? img.id : ""); scheduleAutosave(); });
+  document.getElementById("btnBackupCurrentSession").addEventListener("click", function () {
+    if (state.currentSession) downloadSessionBackup(state.currentSession); });
+  document.getElementById("btnExportFromWork").addEventListener("click", function () {
+    if (state.currentSession) initiateExportSession(state.currentSession); });
+  // Filter buttons
+  const filterBtns = document.querySelectorAll(".filter-btn");
+  for (let i = 0; i < filterBtns.length; i++) { filterBtns[i].addEventListener("click", function () {
+      for (let j = 0; j < filterBtns.length; j++) filterBtns[j].classList.remove("active");
+      this.classList.add("active"); state.currentFilter = this.getAttribute("data-filter") || "all";
+      renderImageList(); }); }
+  // Centre toolbar
+  document.getElementById("btnToolDraw").addEventListener("click", function () { setActiveTool("draw", true); });
+  document.getElementById("btnToolQuad").addEventListener("click", function () { setActiveTool("quad", true); });
+  document.getElementById("btnToolSelect").addEventListener("click", function () {
+    setActiveTool("select", false); });
+  document.getElementById("btnFitView").addEventListener("click", function () { fitImageToCanvas(); });
+  document.getElementById("btnLabelMode").addEventListener("click", function () { cycleLabelMode(); });
+  document.getElementById("btnPickDraftDir").addEventListener("click", function () { pickDraftDir(); });
+  document.getElementById("btnOutlineOnly").addEventListener("click", function () { toggleOutlineOnly(); });
+  document.getElementById("btnSquareUp").addEventListener("click", function () { squareUpSelectedBox(); });
+  document.getElementById("sliderBrightness").addEventListener("input", function (e) {
+    state.brightness = Number(e.target.value); renderCanvas();
+  }); document.getElementById("sliderContrast").addEventListener("input", function (e) {
+    state.contrast = Number(e.target.value); renderCanvas();
+  }); document.getElementById("btnInvertFilter").addEventListener("click", function () {
+    state.invert = !state.invert; this.classList.toggle("btn-primary", state.invert); renderCanvas(); });
+  document.getElementById("btnResetFilter").addEventListener("click", function () {
+    state.brightness = 100; state.contrast = 100;
+    state.invert = false; document.getElementById("sliderBrightness").value = "100";
+    document.getElementById("sliderContrast").value = "100";
+    document.getElementById("btnInvertFilter").classList.remove("btn-primary"); renderCanvas(); });
+  // Right panel controls
+  document.getElementById("imageNoteInput").addEventListener("input", function (e) {
+    if (isSessionReadOnly()) return; const lbl = getCurrentImageLabel();
+    if (!lbl) return; lbl.note = e.target.value; renderImageList(); scheduleAutosave();
+  }); document.getElementById("btnMarkDone").addEventListener("click", handleMarkDoneClick);
+  document.getElementById("btnMarkNoFault").addEventListener("click", handleMarkNoFaultClick);
+  document.getElementById("btnUndo").addEventListener("click", performUndo);
+  document.getElementById("btnRedo").addEventListener("click", performRedo);
+  document.getElementById("btnResetImage").addEventListener("click", handleResetCurrentImage);
+  // Resize & visibility handlers
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(function () { if (document.getElementById("workScreen").classList.contains("active")) { syncCanvasSize(); } })
+      .observe(document.getElementById("canvasViewport")); }
+  window.addEventListener("resize", function () {
+    if (document.getElementById("workScreen").classList.contains("active")) { fitImageToCanvas(); }
+  }); document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden" && state.currentSession) {
+      syncActiveIntervalToSession(); storage.saveSession(state.currentSession); } });
+  window.addEventListener("beforeunload", function () {
+    if (state.currentSession) { closeActiveInterval(); storage.saveSession(state.currentSession); }
+  }); setupCanvasInteractions(); setupKeyboardShortcuts();
+}
+async function bootstrapApp() {
+  wireAllEvents(); await storage.init(); await initEmbeddedPackageIfPresent();
+}
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  window.addEventListener("DOMContentLoaded", bootstrapApp);
+}
+</script>
+</body>
+</html>

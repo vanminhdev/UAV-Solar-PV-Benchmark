@@ -9,7 +9,7 @@ how far is it from the centre of the same box on the thermal ortho (thermal_boxe
 There are NO field checkpoints. The ortho box centre is the reference, so everything below is a *consistency*
 measurement between two products of the same flight, not an absolute accuracy.
 
-Inputs (read only): <dataset>/farm_*/annotations/model2_thermal_anomaly_obb/{thermal_box_frame_detections,thermal_boxes}.csv,
+Inputs (read only): <dataset>/farm_*/annotations/thermal_anomaly_obb/{thermal_box_frame_detections,thermal_boxes}.csv,
   metadata/inventory/{image_inventory,speed_xmp}.csv, metadata/association/thermal_box_to_cell.csv,
   farm_01_thuan_nam_19/module_reference/TN19_modules_master.gpkg (layer 'modules').
 Outputs (new files only): <out>/projection_residuals.csv, projection_summary.csv, projection_dependence.csv,
@@ -178,9 +178,9 @@ def altitude_class(fid):
 # ------------------------------------------------------------------------------------------ main
 def load(dataset: Path):
     det = pd.concat([pd.read_csv(f) for f in sorted(dataset.glob(
-        "farm_*/annotations/model2_thermal_anomaly_obb/thermal_box_frame_detections.csv"))], ignore_index=True)
+        "farm_*/annotations/thermal_anomaly_obb/thermal_box_frame_detections.csv"))], ignore_index=True)
     bx = pd.concat([pd.read_csv(f) for f in sorted(dataset.glob(
-        "farm_*/annotations/model2_thermal_anomaly_obb/thermal_boxes.csv"))], ignore_index=True)
+        "farm_*/annotations/thermal_anomaly_obb/thermal_boxes.csv"))], ignore_index=True)
     inv = pd.read_csv(dataset / "metadata/inventory/image_inventory.csv")
     inv = inv[inv.sensor == "T"].copy()
     spd = pd.read_csv(dataset / "metadata/inventory/speed_xmp.csv")

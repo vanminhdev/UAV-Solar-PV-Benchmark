@@ -21,8 +21,7 @@ splits:
   test_ratio: 0.25
 
 models:
-  model1_pv_detector: {task: yolo_obb, input_size: 1024, classes: [solar_panel]}
-  model2_thermal_anomaly:
+  thermal_anomaly:
     task: yolo_obb
     input_size: 640
     classes: [SingleHotSpot, MultiHotSpot, Bypass, ModuleOpenCircuit]  # 416 boxes in 31 frames of one TN19 42M flight; train only
