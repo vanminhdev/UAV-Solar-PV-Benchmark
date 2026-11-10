@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 """Cell-level inspection layer of TN19: which reference cells carry a thermal anomaly, in which flight and class.
 
-    python -X utf8 code/scripts/build_inspection_cell_layer.py
+    python -X utf8 code/scripts/build_inspection_cell_layer.py [TN19|TNDL|TT]
+
+TNDL and TT use `metadata/association/thermal_box_to_cell_TNDL_TT.csv` (script `associate_boxes_other_farms.py`) and write
+`<farm>_inspection_cells.gpkg`; the repeated-cell tables are written for TN19 only (the other two farms have boxes of one flight).
 
 Inputs (read only): farm_01_thuan_nam_19/module_reference/TN19_modules_master.gpkg (layer `modules`),
   metadata/association/thermal_box_to_cell.csv, farm_01_thuan_nam_19/annotations/thermal_anomaly_obb/thermal_boxes.csv.
@@ -33,8 +36,12 @@ from build_footprints import read_gpkg_layer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 DS = ROOT / "dataset"
-FARM = DS / "farm_01_thuan_nam_19"
-OUT_GPKG = FARM / "annotations" / "thermal_anomaly_obb" / "TN19_inspection_cells.gpkg"
+CFG = {"TN19": ("farm_01_thuan_nam_19", "TN19_modules_master.gpkg"),
+       "TNDL": ("farm_03_thuan_nam_duc_long", "TNDL_modules_master.gpkg"),
+       "TT": ("farm_04_thien_tan", "TT_modules_master.gpkg")}
+KEY = sys.argv[1] if len(sys.argv) > 1 else "TN19"
+FARM = DS / CFG[KEY][0]
+OUT_GPKG = FARM / "annotations" / "thermal_anomaly_obb" / f"{KEY}_inspection_cells.gpkg"
 SRID = 32649
 
 
@@ -54,13 +61,17 @@ def write_layer(con, name, df, cols):
     con.executemany(f'INSERT INTO "{name}" (geom,{",".join(c for c, _ in cols)}) VALUES ({ph})', rows)
     b = np.array([g.bounds for g in df.geometry])
     con.execute("INSERT INTO gpkg_contents VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (name, "features", name, f"TN19 {name}", "2026-11-08T00:00:00Z", b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max()) + (SRID,))
+                (name, "features", name, f"{KEY} {name}", "2026-11-08T00:00:00Z", b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max()) + (SRID,))
     con.execute("INSERT INTO gpkg_geometry_columns VALUES (?,?,?,?,?,?)", (name, "geom", "POLYGON", SRID, 0, 0))
 
 
 def main():
-    cells = read_gpkg_layer(FARM / "module_reference" / "TN19_modules_master.gpkg", "modules").set_index("module_id")
-    a = pd.read_csv(DS / "metadata" / "association" / "thermal_box_to_cell.csv")
+    cells = read_gpkg_layer(FARM / "module_reference" / CFG[KEY][1], "modules").set_index("module_id")
+    if KEY == "TN19":
+        a = pd.read_csv(DS / "metadata" / "association" / "thermal_box_to_cell.csv")
+    else:
+        a = pd.read_csv(DS / "metadata" / "association" / "thermal_box_to_cell_TNDL_TT.csv")
+        a = a[a.farm == KEY].drop(columns=["farm"])
     bx = pd.read_csv(FARM / "annotations" / "thermal_anomaly_obb" / "thermal_boxes.csv")
     a = a.merge(bx[["box_id", "n_frames", "E1", "N1", "E2", "N2", "E3", "N3", "E4", "N4"]], on="box_id", how="left")
     a["module_id_assigned"] = np.where(a.status == "unique", a.module_id, None)
@@ -104,6 +115,9 @@ def main():
     con.commit()
     con.close()
 
+    if KEY != "TN19":
+        print(KEY, "cells with boxes:", len(dc), "boxes:", len(boxes), "assigned:", int(boxes.module_id.notna().sum()))
+        return
     # ---- repeated cells
     rep = u.groupby("module_id").filter(lambda g: g.flight_id.nunique() >= 2)
     rows = []

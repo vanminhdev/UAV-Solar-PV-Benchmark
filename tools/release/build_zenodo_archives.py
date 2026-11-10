@@ -59,6 +59,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--max-zip-gb", type=float, default=8.0)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--only", default=None, help="write only this record, e.g. R1 (the plan of all records is still checked)")
     a = ap.parse_args()
     root = os.path.abspath(a.dataset)
     cap = a.max_zip_gb * 1e9
@@ -100,6 +101,8 @@ def main():
         return
     rows = []
     for rec, name, fl in plan:
+        if a.only and rec != a.only:
+            continue
         d = os.path.join(a.out, rec)
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, name)
