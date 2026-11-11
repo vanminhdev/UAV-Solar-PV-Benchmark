@@ -49,3 +49,6 @@ scratch/
 
 # Dataset is released separately (Zenodo), never in this repo
 dataset/
+
+# upload helper that reads a Zenodo token from the Colab secrets; never publish
+tools/release/colab_supervisor.py
